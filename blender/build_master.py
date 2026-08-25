@@ -104,7 +104,6 @@ if __name__ == "__main__":
     root = Path(__file__).resolve().parent.parent
     output_path = root / "artifacts" / "z50ii_master.blend"
     bpy.context.preferences.filepaths.save_version = 0
-    build_scene(output_path)
-    verify_core_internal_catalog()
+    build_scene(output_path, validator=verify_core_internal_catalog)
     if os.environ.get("Z50II_RENDER_SILHOUETTES") == "1":
         render_silhouette_views(root / "artifacts" / "renders" / "silhouette")

@@ -107,7 +107,10 @@ def build_chassis_front() -> list[bpy.types.Object]:
     chassis = torus("Z50II-01-001_magnesium_chassis", 28.8, 1.3, (0, 12.5, 0), (90, 0, 0), collection, magnesium)
     for suffix, size, location in (
         ("top_rail", (82, 2.4, 2.5), (-2, 12.5, 29.5)),
-        ("bottom_rail", (82, 2.4, 2.5), (-2, 12.5, -30.5)),
+        # The photographer-right battery/card bay occupies X=-51.5..-18.5
+        # after handedness correction. Keep the continuous load rail on the
+        # body side and add a short grip-side return beyond that opening.
+        ("bottom_rail", (60, 2.4, 2.5), (-13, 12.5, -30.5)),
         ("left_upright", (2.5, 2.4, 58), (-43, 12.5, -0.5)),
         ("right_upright", (2.5, 2.4, 58), (39, 12.5, -0.5)),
     ):
@@ -115,8 +118,11 @@ def build_chassis_front() -> list[bpy.types.Object]:
     _rail("Z50II_chassis_upper_left_web", (30, 2.0, 2.0), (-30, 12.4, 21), 0.5, collection, magnesium, chassis, 35)
     _rail("Z50II_chassis_upper_right_web", (28, 2.0, 2.0), (27, 12.4, 21), 0.5, collection, magnesium, chassis, -35)
     _rail("Z50II_chassis_lower_left_web", (28, 2.0, 2.0), (-29, 12.4, -22), 0.5, collection, magnesium, chassis, -35)
-    _rail("Z50II_chassis_lower_right_web", (26, 2.0, 2.0), (27, 12.4, -22), 0.5, collection, magnesium, chassis, 35)
-    for index, angle in enumerate((45, 135, 225, 315)):
+    _rail("Z50II_chassis_bottom_grip_return", (8, 2.4, 2.5), (54, 12.5, -30.5), 0.7, collection, magnesium, chassis)
+    # Keep the photographer-right lower bay and EMI-shield envelope open. A
+    # compact land terminates the diagonal load path outside both envelopes.
+    _rail("Z50II_chassis_lower_right_web", (2.0, 2.0, 2.0), (-23.5, 12.4, -22), 0.5, collection, magnesium, chassis)
+    for index, angle in enumerate((45, 135, 225, 305)):
         x = 34.0 * __import__("math").cos(radians(angle))
         z = 34.0 * __import__("math").sin(radians(angle))
         _parent(cylinder(f"Z50II_chassis_mount_boss_{index + 1}", 3.0, 3.0, (x, 12.5, z), (90, 0, 0), collection, magnesium, vertices=32), chassis)
@@ -127,11 +133,11 @@ def build_chassis_front() -> list[bpy.types.Object]:
         _rail(f"Z50II_front_frame_tab_{index + 1}", (10, 1.8, 3), (x, 7.5, z), 0.45, collection, dark, front_frame)
     _annotate(front_frame, "Z50II-01-002", "由环形薄壁梁和四个壳体安装耳组成的开放前内框。", "Open front inner frame made from a thin ring beam and four shell-mount tabs.")
 
-    grip_frame = rounded_box("Z50II-01-003_grip_inner_frame", (2.5, 3.0, 49), (45, 7, -6), 0.7, collection, magnesium)
+    grip_frame = rounded_box("Z50II-01-003_grip_inner_frame", (1.2, 3.0, 49), (47.2, 7, -6), 0.55, collection, magnesium)
     _rail("Z50II_grip_cage_front_outer", (2.5, 3.0, 46), (60, -5, -7), 0.7, collection, magnesium, grip_frame)
     _rail("Z50II_grip_cage_rear_outer", (2.5, 3.0, 45), (59, 18, -7), 0.7, collection, magnesium, grip_frame)
     for index, (z, y, angle) in enumerate(((18, 0, -10), (5, -2, -6), (-10, -1, 4), (-25, 3, 9))):
-        _rail(f"Z50II_grip_cage_crossmember_{index + 1}", (17, 2.2, 2.2), (52.5, y, z), 0.5, collection, magnesium, grip_frame, angle)
+        _rail(f"Z50II_grip_cage_crossmember_{index + 1}", (12, 2.2, 2.2), (54, y, z), 0.5, collection, magnesium, grip_frame, angle)
     _rail("Z50II_grip_cage_palm_web", (2.0, 20, 32), (63, 1, -7), 0.6, collection, magnesium, grip_frame)
     _annotate(grip_frame, "Z50II-01-003", "由纵梁、横梁和掌托薄壁网组成的开放握柄笼架。", "Open grip cage formed by longitudinal rails, cross-members, and a thin palm web.")
 
@@ -153,10 +159,20 @@ def build_chassis_front() -> list[bpy.types.Object]:
         _parent(cylinder(f"Z50II_sensor_rail_boss_{x}_{z}", 2.2, 2.0, (x, 15, z), (90, 0, 0), collection, dark, vertices=24), sensor_top)
     _annotate(sensor_top, "Z50II-01-005", "为后续传感器模块保留空间的四边导轨和角部安装柱。", "Four-sided rail with corner bosses reserving the later sensor-module volume.")
 
-    bottom_plate = rounded_box("Z50II-01-006_bottom_reinforcement_plate", (78, 18, 1.8), (1, 15, -33.2), 0.6, collection, magnesium)
-    for x in (-31, 27):
+    # The reinforcement follows the real bottom-shell bay opening rather than
+    # spanning it with a solid plate. The selectable root is the central plate;
+    # four child rails frame the opening outside its X/Y sweep footprint.
+    bottom_plate = rounded_box("Z50II-01-006_bottom_reinforcement_plate", (56, 18, 1.8), (-10, 15, -33.2), 0.6, collection, magnesium)
+    for suffix, size, location in (
+        ("bay_left", (2.0, 25.0, 1.8), (52.2, 17.0, -33.2)),
+        ("bay_right", (2.0, 25.0, 1.8), (17.2, 17.0, -33.2)),
+        ("bay_front", (33.0, 2.0, 1.8), (34.7, 2.7, -33.2)),
+        ("bay_rear", (33.0, 2.0, 1.8), (34.7, 32.2, -33.2)),
+    ):
+        _rail(f"Z50II_bottom_plate_{suffix}", size, location, 0.45, collection, magnesium, bottom_plate)
+    for x in (-31, -8):
         _rail(f"Z50II_bottom_plate_longitudinal_rib_{x}", (2.0, 16, 2.4), (x, 15, -31.8), 0.45, collection, magnesium, bottom_plate)
-    for x in (-18, 12, 28):
+    for x in (-18, -2, 12):
         _rail(f"Z50II_bottom_plate_cross_rib_{x}", (18, 2.0, 2.4), (x, 15, -31.8), 0.45, collection, magnesium, bottom_plate)
     _annotate(bottom_plate, "Z50II-01-006", "带冲压式纵横加强筋和三脚架安装区的1.8毫米底部加强板。", "1.8 mm base reinforcement with formed longitudinal/cross ribs and tripod land.")
 

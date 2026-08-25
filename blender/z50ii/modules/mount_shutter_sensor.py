@@ -30,8 +30,13 @@ PART_META = {
 
 
 def _clear(collection: bpy.types.Collection) -> None:
-    for obj in tuple(collection.objects):
+    objects = tuple(collection.all_objects)
+    mesh_data = {obj.data for obj in objects if obj.type == "MESH" and obj.data is not None}
+    for obj in objects:
         bpy.data.objects.remove(obj, do_unlink=True)
+    for mesh in mesh_data:
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
 
 
 def _parent(child: bpy.types.Object, parent: bpy.types.Object) -> bpy.types.Object:
@@ -90,34 +95,35 @@ def build_mount_shutter_sensor() -> list[bpy.types.Object]:
     glass = get_material("Z50II Sensor Cover Glass", (0.055, 0.095, 0.105, 1), metallic=0.12, roughness=0.08)
     pcb = get_material("Z50II Sensor PCB", (0.035, 0.18, 0.10, 1), metallic=0.10, roughness=0.45)
 
-    mount_ring = torus("Z50II-03-001_mount_ring", 29.0, 1.5, (0, -0.2, 0), (90, 0, 0), collection, steel)
-    for index, angle in enumerate((45, 135, 225, 315), start=1):
+    mount_ring = torus("Z50II-03-001_mount_ring", 28.25, 0.75, (0, -2.2, 0), (90, 0, 0), collection, steel)
+    for index, angle in enumerate((55, 125, 235, 305), start=1):
         from math import cos, sin
-        x = 31.7 * cos(radians(angle))
-        z = 31.7 * sin(radians(angle))
-        _parent(cylinder(f"Z50II_mount_fastening_land_{index}", 2.8, 1.2, (x, -0.2, z), (90, 0, 0), collection, steel, vertices=32), mount_ring)
+        x = 32.0 * cos(radians(angle))
+        z = 32.0 * sin(radians(angle))
+        _parent(cylinder(f"Z50II_mount_fastening_land_{index}", 2.2, 0.9, (x, -1.4, z), (90, 0, 0), collection, steel, vertices=32), mount_ring)
     for index, (x, z, angle) in enumerate(((-17, 21, -34), (24, 6, 78), (-8, -25, 12)), start=1):
-        tab = rounded_box(f"Z50II_mount_bayonet_tab_{index}", (8.0, 1.1, 2.2), (x, -1.1, z), 0.35, collection, steel)
+        tab = rounded_box(f"Z50II_mount_bayonet_tab_{index}", (8.0, 0.8, 2.2), (x, -3.15, z), 0.35, collection, steel)
         tab.rotation_euler[1] = radians(angle)
         _parent(tab, mount_ring)
     _annotate(mount_ring, "Z50II-03-001", "具有卡爪和四个紧固座的Z卡口金属环；内部尺寸为参考重建。", "Z-mount metal ring with bayonet tabs and four fastening lands; internal dimensions are a reference reconstruction.")
 
-    gasket = torus("Z50II-03-002_mount_gasket", 28.8, 0.62, (0, 2.1, 0), (90, 0, 0), collection, gasket_mat)
+    gasket = torus("Z50II-03-002_mount_gasket", 28.10, 0.25, (0, 0.5, 0), (90, 0, 0), collection, gasket_mat)
     _annotate(gasket, "Z50II-03-002", "位于金属卡口后方的独立弹性防尘密封圈。", "Separate elastomer dust gasket immediately behind the metal mount.")
 
-    contact_block = rounded_box("Z50II-03-003_contact_block", (23.0, 2.0, 4.0), (-6.0, 2.2, -24.0), 1.2, collection, gasket_mat)
-    _parent(rounded_box("Z50II_mount_contact_block_key", (3.0, 2.3, 2.0), (7.0, 2.2, -22.4), 0.6, collection, gasket_mat), contact_block)
+    contact_block = rounded_box("Z50II-03-003_contact_block", (14.0, 1.2, 3.2), (0.0, 0.8, -23.5), 1.0, collection, gasket_mat)
+    _parent(rounded_box("Z50II_mount_contact_block_key", (2.0, 1.4, 1.5), (8.0, 0.8, -22.8), 0.5, collection, gasket_mat), contact_block)
     _annotate(contact_block, "Z50II-03-003", "弧形区域内的绝缘触点座，为后续镜头接口保留位置。", "Insulated mount contact carrier positioned for the reserved future lens interface.")
 
-    pin_bank = cylinder("Z50II-03-004_contact_pin_bank", 0.75, 1.6, (-15.0, 0.8, -24.0), (90, 0, 0), collection, gold, vertices=24)
-    for index, x in enumerate((-13.2, -11.4, -9.6, -7.8, -6.0, -4.2, -2.4, -0.6, 1.2, 3.0), start=2):
-        _parent(cylinder(f"Z50II_mount_contact_pin_{index:02d}", 0.75, 1.6, (x, 0.8, -24.0), (90, 0, 0), collection, gold, vertices=24), pin_bank)
+    pin_positions = (-6.0, -4.8, -3.6, -2.4, -1.2, 0.0, 1.2, 2.4, 3.6, 4.8, 6.0)
+    pin_bank = cylinder("Z50II-03-004_contact_pin_bank", 0.48, 0.9, (pin_positions[0], -0.15, -23.5), (90, 0, 0), collection, gold, vertices=24)
+    for index, x in enumerate(pin_positions[1:], start=2):
+        _parent(cylinder(f"Z50II_mount_contact_pin_{index:02d}", 0.48, 0.9, (x, -0.15, -23.5), (90, 0, 0), collection, gold, vertices=24), pin_bank)
     _annotate(pin_bank, "Z50II-03-004", "11枚独立圆头导电针的教学化触点组。", "Teaching representation of an eleven-pin bank with separate rounded conductive contacts.")
 
-    spacer = torus("Z50II-03-005_mount_spacer", 28.1, 1.0, (0, 5.2, 0), (90, 0, 0), collection, dark)
+    spacer = torus("Z50II-03-005_mount_spacer", 28.10, 0.30, (0, 2.4, 0), (90, 0, 0), collection, dark)
     for index, angle in enumerate((0, 90, 180, 270), start=1):
         from math import cos, sin
-        _parent(cylinder(f"Z50II_mount_spacer_boss_{index}", 2.2, 1.8, (31.2 * cos(radians(angle)), 5.2, 31.2 * sin(radians(angle))), (90, 0, 0), collection, dark, vertices=24), spacer)
+        _parent(cylinder(f"Z50II_mount_spacer_boss_{index}", 0.65, 1.0, (29.2 * cos(radians(angle)), 2.4, 29.2 * sin(radians(angle))), (90, 0, 0), collection, dark, vertices=24), spacer)
     _annotate(spacer, "Z50II-03-005", "保持卡口与快门组件间光路间隔的开放式支承环。", "Open support ring preserving the optical-path spacing between mount and shutter assembly.")
 
     front_curtain = _curtain("Z50II-03-006_shutter_front_curtain", 8.6, 0.8, collection, curtain_mat)

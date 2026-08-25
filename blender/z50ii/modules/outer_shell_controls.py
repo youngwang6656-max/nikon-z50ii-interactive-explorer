@@ -440,17 +440,47 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         cap_front=True,
         cap_back=False,
     )
-    _round_cut(front_shell, "reserved_z_mount_opening_55mm", 27.5, 7.0, (0, 1.5, 0), (90, 0, 0))
-    _pill_cut(front_shell, "fn1_pill_bore", 5.9, 9.9, 20.0, (32, 0.6, 8), collection)
-    _pill_cut(front_shell, "fn2_pill_bore", 5.7, 9.5, 20.0, (32, 0.6, -3.5), collection)
-    _round_cut(front_shell, "lens_release_bore", 3.6, 5.0, (25, 0.6, 7), (90, 0, 0))
+    # The shell cut clears the complete selectable mount assembly. The actual
+    # 55 mm optical opening remains defined by the Task-6 ring's 27.5 mm inner
+    # radius, not by a second exterior torus embedded in the shell.
+    _round_cut(front_shell, "reserved_z_mount_opening_55mm", 30.15, 7.0, (0, 1.5, 0), (90, 0, 0))
+    # Continue the bottom-shell bay through the lower skirt so the battery and
+    # card have a real vertical service path after the door is removed. Source
+    # +X is photographer-right after the final handedness reflection.
+    _box_cut(front_shell, "battery_card_vertical_chute", (33.0, 28.0, 48.0), (35.0, 17.0, -16.0))
+    _pill_cut(front_shell, "fn1_pill_bore", 5.9, 9.9, 20.0, (35, 0.6, 8), collection)
+    _pill_cut(front_shell, "fn2_pill_bore", 5.7, 9.5, 20.0, (35, 0.6, -3.5), collection)
+    _round_cut(front_shell, "lens_release_bore", 3.6, 5.0, (34.5, 0.6, 7), (90, 0, 0))
     _box_cut(front_shell, "rear_display_hinge_pocket", (7.0, 7.0, 25.0), (-53.0, 30.0, -4.0))
     _post_cut_finish(front_shell, 0.45)
 
-    mount_lip = torus("Z50II_mount_interface_lip", 29.2, 1.1, (0, -0.7, 0), (90, 0, 0), collection, metal)
+    seat_angles = (55, 125, 235, 305)
+    seat_radius = 32.0
+    first_angle = radians(seat_angles[0])
+    mount_lip = rounded_box(
+        "Z50II_mount_interface_lip",
+        (3.0, 0.40, 5.2),
+        (seat_radius * cos(first_angle), -0.55, seat_radius * sin(first_angle)),
+        0.45,
+        collection,
+        metal,
+    )
+    mount_lip.rotation_euler[1] = -first_angle
+    mount_lip["mountRole"] = "recessed_seat"
+    mount_lip["continuousRing"] = False
     _parent(mount_lip, front_shell)
-    cavity = cylinder("Z50II_mount_reserved_dark_cavity", 27.1, 0.7, (0, 5.2, 0), (90, 0, 0), collection, glass, vertices=96)
-    _parent(cavity, front_shell)
+    for index, angle_degrees in enumerate(seat_angles[1:], start=2):
+        angle = radians(angle_degrees)
+        pad = rounded_box(
+            f"Z50II_mount_recessed_seat_{index}",
+            (3.0, 0.40, 5.2),
+            (seat_radius * cos(angle), -0.55, seat_radius * sin(angle)),
+            0.45,
+            collection,
+            metal,
+        )
+        pad.rotation_euler[1] = -angle
+        _parent(pad, front_shell)
     for suffix, size, location in (
         ("top", (86, 1.8, 3.0), (-3, 32.3, 29)),
         ("bottom", (88, 1.8, 3.0), (-3, 32.3, -31)),
@@ -474,9 +504,9 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         z = 33.0 * sin(radians(angle))
         boss = cylinder(f"Z50II_front_mount_boss_{index + 1}", 2.8, 3.2, (x, 3.0, z), (90, 0, 0), collection, edge, vertices=32)
         _parent(boss, front_shell)
-    _pill_seat("Z50II_fn1_pill_seat", 6.7, 10.7, (32, -0.55, 8), collection, edge, front_shell)
-    _pill_seat("Z50II_fn2_pill_seat", 6.5, 10.3, (32, -0.55, -3.5), collection, edge, front_shell)
-    _parent(torus("Z50II_lens_release_seat", 4.1, 0.45, (25, -0.55, 7), (90, 0, 0), collection, edge), front_shell)
+    _pill_seat("Z50II_fn1_pill_seat", 6.7, 10.7, (35, -0.55, 8), collection, edge, front_shell)
+    _pill_seat("Z50II_fn2_pill_seat", 6.5, 10.3, (35, -0.55, -3.5), collection, edge, front_shell)
+    _parent(torus("Z50II_lens_release_seat", 4.1, 0.45, (34.5, -0.55, 7), (90, 0, 0), collection, edge), front_shell)
     _decal_anchor("Z50II_brand_decal_anchor", "brand", (-18, -0.8, 27), 8.0, collection, front_shell)
     _decal_anchor("Z50II_model_decal_anchor", "model", (-41, -0.8, -27), 4.0, collection, front_shell)
     _annotate(front_shell, "Z50II-02-001", "带开放后部、内翻边和55毫米卡口开口的薄壁外壳参考重建。", "Thin open-back reference shell with inner flanges and a 55 mm mount opening.")
@@ -680,7 +710,7 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         4.8,
         8.8,
         1.7,
-        (32, -0.85, 8),
+        (35, -0.85, 8),
         collection,
         control,
         segments=16,
@@ -692,14 +722,14 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         4.6,
         8.4,
         1.7,
-        (32, -0.85, -3.5),
+        (35, -0.85, -3.5),
         collection,
         control,
         segments=16,
         bevel_mm=0.35,
     )
     _annotate(fn2, "Z50II-02-017", "位于独立前壳沉孔中的Fn2功能按钮。", "Fn2 function button seated in a dedicated front-shell bore.")
-    lens_release = cylinder("Z50II-02-018_lens_release_button", 3.3, 1.9, (25, -0.8, 7), (90, 0, 0), collection, control, vertices=48)
+    lens_release = cylinder("Z50II-02-018_lens_release_button", 3.3, 1.9, (34.5, -0.8, 7), (90, 0, 0), collection, control, vertices=48)
     _annotate(lens_release, "Z50II-02-018", "预留Z卡口旁沉孔中的镜头释放按钮；本期不含镜头。", "Lens-release button in a mount-side bore; no lens is included.")
 
     left_lug = torus("Z50II-02-019_left_strap_lug", 4.0, 1.2, (-55.8, 11, 20), (0, 90, 0), collection, metal)

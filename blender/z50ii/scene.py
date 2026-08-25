@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from importlib import import_module
 from pathlib import Path
+from typing import Callable
 
 import bpy
 
@@ -80,10 +81,16 @@ def call_module_builders() -> None:
             builder()
 
 
-def build_scene(output_path: Path) -> Path:
-    """Build all currently available modules and save the master Blender scene."""
+def build_scene(
+    output_path: Path,
+    *,
+    validator: Callable[[], None] | None = None,
+) -> Path:
+    """Build, optionally validate, then save without touching output on failure."""
     initialize_scene()
     call_module_builders()
+    if validator is not None:
+        validator()
     destination = Path(output_path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(destination))

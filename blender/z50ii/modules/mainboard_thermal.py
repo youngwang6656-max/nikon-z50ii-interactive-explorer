@@ -28,8 +28,13 @@ PART_META = {
 
 
 def _clear(collection: bpy.types.Collection) -> None:
-    for obj in tuple(collection.objects):
+    objects = tuple(collection.all_objects)
+    mesh_data = {obj.data for obj in objects if obj.type == "MESH" and obj.data is not None}
+    for obj in objects:
         bpy.data.objects.remove(obj, do_unlink=True)
+    for mesh in mesh_data:
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
 
 
 def _parent(child: bpy.types.Object, parent: bpy.types.Object) -> bpy.types.Object:
@@ -77,17 +82,33 @@ def _package(name, size, location, collection, body_material, pad_material):
     pin_count = 6
     x0 = location[0] - size[0] * 0.38
     spacing = size[0] * 0.76 / (pin_count - 1)
+    board_contact_y = location[1] + size[1] / 2.0 - 0.06
     for index in range(pin_count):
         x = x0 + index * spacing
-        _parent(rounded_box(f"{name}_lead_front_{index + 1}", (0.65, 0.22, 0.55), (x, location[1] - size[1] / 2 - 0.10, location[2] - size[2] / 2 + 0.8), 0.10, collection, pad_material), root)
-        _parent(rounded_box(f"{name}_lead_rear_{index + 1}", (0.65, 0.22, 0.55), (x, location[1] - size[1] / 2 - 0.10, location[2] + size[2] / 2 - 0.8), 0.10, collection, pad_material), root)
+        _parent(rounded_box(f"{name}_lead_front_{index + 1}", (0.65, 0.22, 0.55), (x, board_contact_y, location[2] - size[2] / 2 + 0.8), 0.10, collection, pad_material), root)
+        _parent(rounded_box(f"{name}_lead_rear_{index + 1}", (0.65, 0.22, 0.55), (x, board_contact_y, location[2] + size[2] / 2 - 0.8), 0.10, collection, pad_material), root)
     return root
 
 
-def _pressed_shield(name, width, height, y, collection, material):
-    root = panel(name, _board_outline(width, height), 0.42, (0, y, 0), (0, 0, 0), collection, material)
+def _pressed_shield(name, width, height, y, collection, material, *, notch_upper_left=False):
+    outline = _board_outline(width, height)
+    if notch_upper_left:
+        outline = (
+            (-width / 2 + 4.0, -height / 2),
+            (width / 2 - 4.0, -height / 2),
+            (width / 2, -height / 2 + 5.0),
+            (width / 2, height / 2 - 7.0),
+            (width / 2 - 6.0, height / 2),
+            (-13.5, height / 2),
+            (-13.5, height / 2 - 4.0),
+            (-width / 2, height / 2 - 8.0),
+            (-width / 2, -height / 2 + 4.0),
+        )
+    root = panel(name, outline, 0.42, (0, y, 0), (0, 0, 0), collection, material)
+    top_width = width - (14.0 if notch_upper_left else 9.0)
+    top_center_x = 4.0 if notch_upper_left else 0.0
     for suffix, size, location in (
-        ("top_rib", (width - 9.0, 0.75, 1.3), (0, y - 0.45, height / 2 - 3.0)),
+        ("top_rib", (top_width, 0.75, 1.3), (top_center_x, y - 0.45, height / 2 - 3.0)),
         ("bottom_rib", (width - 9.0, 0.75, 1.3), (0, y - 0.45, -height / 2 + 3.0)),
         ("left_rib", (1.3, 0.75, height - 10.0), (-width / 2 + 3.0, y - 0.45, 0)),
         ("right_rib", (1.3, 0.75, height - 12.0), (width / 2 - 3.0, y - 0.45, 0)),
@@ -119,38 +140,38 @@ def build_mainboard_thermal() -> list[bpy.types.Object]:
             _parent(rounded_box(f"Z50II_main_pcb_passive_{row}_{column}", (2.2, 0.55, 0.9), (x, 21.68, z), 0.18, collection, package_mat), main_pcb)
     _annotate(main_pcb, "Z50II-04-001", "1.0毫米厚多层轮廓主板，带安装焊盘和可读的贴片元件带。", "One-millimetre multi-layer profiled main board with mounting pads and readable surface-component rows.")
 
-    processor = _package("Z50II-04-002_processor_package", (13.0, 1.55, 13.0), (-3.0, 20.9, 3.0), collection, package_mat, copper)
-    _parent(rounded_box("Z50II_processor_heat_cap", (9.0, 0.35, 9.0), (-3.0, 20.0, 3.0), 0.35, collection, spreader_mat), processor)
+    processor = _package("Z50II-04-002_processor_package", (13.0, 1.60, 13.0), (-3.0, 21.15, 3.0), collection, package_mat, copper)
+    _parent(rounded_box("Z50II_processor_heat_cap", (9.0, 0.33, 9.0), (-3.0, 20.165, 3.0), 0.35, collection, spreader_mat), processor)
     _annotate(processor, "Z50II-04-002", "位于导热通道后方的影像处理封装，带引脚和导热顶盖。", "Image-processor package behind the thermal path, with visible leads and a heat cap.")
 
-    memory_a = _package("Z50II-04-003_memory_package_a", (9.5, 1.25, 7.0), (-15.0, 20.98, 10.0), collection, package_mat, copper)
+    memory_a = _package("Z50II-04-003_memory_package_a", (9.5, 1.25, 7.0), (-15.0, 21.325, 10.0), collection, package_mat, copper)
     _annotate(memory_a, "Z50II-04-003", "处理器一侧的独立存储器封装A，用于教学分层。", "Separate memory package A beside the processor for readable teaching-layer separation.")
-    memory_b = _package("Z50II-04-004_memory_package_b", (9.5, 1.25, 7.0), (9.0, 20.98, 13.0), collection, package_mat, copper)
+    memory_b = _package("Z50II-04-004_memory_package_b", (9.5, 1.25, 7.0), (9.0, 21.325, 13.0), collection, package_mat, copper)
     _annotate(memory_b, "Z50II-04-004", "与A封装分离布置的存储器封装B。", "Memory package B positioned separately from package A.")
 
-    power_cluster = _package("Z50II-04-005_power_management_cluster", (7.0, 1.35, 6.0), (14.0, 20.9, -10.0), collection, package_mat, copper)
+    power_cluster = _package("Z50II-04-005_power_management_cluster", (7.0, 1.35, 6.0), (14.0, 21.275, -10.0), collection, package_mat, copper)
     for index, (x, z) in enumerate(((9.0, -15.0), (14.0, -16.0), (19.0, -14.0)), start=1):
-        _parent(cylinder(f"Z50II_power_cluster_inductor_{index}", 2.0, 1.4, (x, 20.85, z), (90, 0, 0), collection, package_mat, vertices=32), power_cluster)
+        _parent(cylinder(f"Z50II_power_cluster_inductor_{index}", 2.0, 1.4, (x, 21.25, z), (90, 0, 0), collection, package_mat, vertices=32), power_cluster)
     for index, x in enumerate((9.5, 12.5, 15.5, 18.5), start=1):
-        _parent(rounded_box(f"Z50II_power_cluster_capacitor_{index}", (1.2, 1.0, 2.4), (x, 20.9, -6.0), 0.25, collection, copper), power_cluster)
+        _parent(rounded_box(f"Z50II_power_cluster_capacitor_{index}", (1.2, 1.0, 2.4), (x, 21.45, -6.0), 0.25, collection, copper), power_cluster)
     _annotate(power_cluster, "Z50II-04-005", "由控制封装、电感和电容组成的可读电源管理簇。", "Readable power-management cluster of controller package, inductors, and capacitors.")
 
-    front_shield = _pressed_shield("Z50II-04-006_front_emi_shield", 43.0, 46.0, 17.9, collection, shield_mat)
+    front_shield = _pressed_shield("Z50II-04-006_front_emi_shield", 43.0, 46.0, 18.2, collection, shield_mat, notch_upper_left=True)
     _annotate(front_shield, "Z50II-04-006", "位于元件前方的冲压式EMI屏蔽罩，带周边加强筋和通风细节。", "Pressed front EMI shield ahead of the components, with perimeter ribs and vent detail.")
 
     rear_shield = _pressed_shield("Z50II-04-007_rear_emi_shield", 45.0, 47.0, 25.8, collection, shield_mat)
     _annotate(rear_shield, "Z50II-04-007", "与主板保持间隔的独立后部EMI屏蔽罩。", "Independent rear EMI shield separated from the main board.")
 
-    heat_spreader = rounded_box("Z50II-04-009_heat_spreader", (17.0, 0.58, 17.0), (-3.0, 19.15, 3.0), 0.55, collection, spreader_mat)
+    heat_spreader = rounded_box("Z50II-04-009_heat_spreader", (17.0, 0.58, 17.0), (-3.0, 18.75, 3.0), 0.55, collection, spreader_mat)
     for suffix, size, location in (
-        ("upper_fin", (23.0, 0.42, 2.0), (-1.0, 19.15, 12.0)),
-        ("lower_fin", (23.0, 0.42, 2.0), (-1.0, 19.15, -6.0)),
-        ("bridge", (2.0, 0.42, 16.0), (10.0, 19.15, 3.0)),
+        ("upper_fin", (23.0, 0.42, 2.0), (-1.0, 18.75, 12.0)),
+        ("lower_fin", (23.0, 0.42, 2.0), (-1.0, 18.75, -6.0)),
+        ("bridge", (2.0, 0.42, 16.0), (10.0, 18.75, 3.0)),
     ):
         _parent(rounded_box(f"Z50II_heat_spreader_{suffix}", size, location, 0.28, collection, spreader_mat), heat_spreader)
     _annotate(heat_spreader, "Z50II-04-009", "位于前屏蔽罩与导热垫之间的铜色扩散片和延伸翼片。", "Copper-toned spreader with extension fins between front shield and thermal pad.")
 
-    thermal_pad = rounded_box("Z50II-04-008_thermal_pad", (12.0, 0.72, 12.0), (-3.0, 19.85, 3.0), 0.45, collection, pad_mat)
+    thermal_pad = rounded_box("Z50II-04-008_thermal_pad", (12.0, 0.90, 12.0), (-3.0, 19.51, 3.0), 0.45, collection, pad_mat)
     thermal_pad["role"] = "detachable thermal interface"
     _annotate(thermal_pad, "Z50II-04-008", "与扩散片和处理器均分离的柔性导热界面垫。", "Flexible thermal interface pad physically separated from both spreader and processor.")
 
@@ -158,18 +179,18 @@ def build_mainboard_thermal() -> list[bpy.types.Object]:
         "Z50II-04-010_secondary_control_pcb",
         ((-7.0, -15.0), (6.0, -15.0), (8.0, -12.0), (8.0, 12.0), (5.0, 15.0), (-7.0, 15.0)),
         0.9,
-        (-30.0, 22.7, 0),
+        (30.0, 22.7, 0),
         (0, 0, 0),
         collection,
         secondary_mat,
     )
     for index, z in enumerate((-10.5, -5.0, 0.5, 6.0, 11.5), start=1):
-        _parent(rounded_box(f"Z50II_secondary_pcb_component_{index}", (3.8, 0.85, 2.1), (-31.5, 22.0, z), 0.30, collection, package_mat), secondary_pcb)
+        _parent(rounded_box(f"Z50II_secondary_pcb_component_{index}", (3.8, 0.85, 2.1), (28.5, 22.0, z), 0.30, collection, package_mat), secondary_pcb)
     _annotate(secondary_pcb, "Z50II-04-010", "主板侧边的狭长轮廓控制板，带独立贴片元件。", "Narrow profiled control board beside the main PCB with separate surface packages.")
 
-    rf_shield = rounded_box("Z50II-04-011_rf_shield_can", (10.0, 1.15, 12.0), (-30.0, 24.4, 7.0), 0.65, collection, shield_mat)
+    rf_shield = rounded_box("Z50II-04-011_rf_shield_can", (10.0, 1.15, 12.0), (30.0, 24.4, 7.0), 0.65, collection, shield_mat)
     for index, z in enumerate((2.8, 7.0, 11.2), start=1):
-        _parent(rounded_box(f"Z50II_rf_shield_seam_{index}", (7.5, 0.20, 0.35), (-30.0, 23.72, z), 0.10, collection, shield_mat), rf_shield)
+        _parent(rounded_box(f"Z50II_rf_shield_seam_{index}", (7.5, 0.20, 0.35), (30.0, 23.72, z), 0.10, collection, shield_mat), rf_shield)
     _annotate(rf_shield, "Z50II-04-011", "覆盖次级控制板局部的独立折边射频屏蔽罩。", "Separate folded RF shield can covering a local region of the secondary board.")
 
     connector_bank = rounded_box("Z50II-04-012_flex_connector_bank", (8.0, 1.1, 2.5), (-16.0, 24.0, -17.0), 0.35, collection, connector_mat)
