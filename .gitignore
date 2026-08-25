@@ -1,2 +1,11 @@
 .worktrees/
 .superpowers/
+node_modules/
+dist/
+tools/
+references/vendor/
+*.blend1
+*.blend2
+test-results/
+playwright-report/
+release/Z50II-Explorer/

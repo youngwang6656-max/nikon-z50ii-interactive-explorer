@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "product": {
+    "name": "Nikon Z50II",
+    "disclaimerZh": "参考级内部结构，非 Nikon 原厂 CAD",
+    "disclaimerEn": "Reference-grade internals; not Nikon manufacturer CAD"
+  },
+  "modules": [
+    {
+      "moduleId": "01_chassis_front",
+      "nameZh": "承力骨架",
+      "nameEn": "Chassis",
+      "urls": { "high": "assets/models/high/01.glb", "low": "assets/models/low/01.glb" },
+      "preload": true
+    },
+    {
+      "moduleId": "02_outer_shell_controls",
+      "nameZh": "外壳",
+      "nameEn": "Outer shell",
+      "urls": { "high": "assets/models/high/02.glb", "low": "assets/models/low/02.glb" },
+      "preload": true
+    }
+  ],
+  "parts": [
+    {
+      "partId": "Z50II-02-001",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": null,
+      "nameZh": "后盖",
+      "nameEn": "Rear cover",
+      "descriptionZh": "外部后盖",
+      "descriptionEn": "External rear cover",
+      "step": 1,
+      "explodeAxis": [0, 0, 1],
+      "explodeDistance": 0.04,
+      "dependsOn": [],
+      "isReferenceGeometry": false
+    },
+    {
+      "partId": "Z50II-01-001",
+      "moduleId": "01_chassis_front",
+      "parentId": null,
+      "nameZh": "承力骨架",
+      "nameEn": "Main chassis",
+      "descriptionZh": "内部承力结构",
+      "descriptionEn": "Internal structural frame",
+      "step": 2,
+      "explodeAxis": [1, 0, 0],
+      "explodeDistance": 0.03,
+      "dependsOn": ["Z50II-02-001"],
+      "isReferenceGeometry": true
+    }
+  ],
+  "steps": [
+    { "step": 1, "titleZh": "移除后盖", "titleEn": "Remove rear cover", "partIds": ["Z50II-02-001"], "cameraPreset": "rear" },
+    { "step": 2, "titleZh": "移除骨架", "titleEn": "Remove chassis", "partIds": ["Z50II-01-001"], "cameraPreset": "three-quarter" }
+  ]
+}
