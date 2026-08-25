@@ -2,6 +2,7 @@
 
 import bmesh
 import bpy
+from math import acos, degrees, isfinite
 from mathutils import Vector
 
 
@@ -29,6 +30,67 @@ def _world_bounds(obj: bpy.types.Object) -> tuple[Vector, Vector]:
     return minimum, maximum
 
 
+def _ray_hits(
+    obj: bpy.types.Object,
+    origin_world: tuple[float, float, float],
+    direction_world: tuple[float, float, float],
+    distance_mm: float,
+) -> bool:
+    """Probe evaluated geometry with a short world-space ray."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated = obj.evaluated_get(depsgraph)
+    inverse = evaluated.matrix_world.inverted()
+    origin_local = inverse @ Vector(origin_world)
+    direction_local = (inverse.to_3x3() @ Vector(direction_world)).normalized()
+    hit, location, _normal, _index = evaluated.ray_cast(origin_local, direction_local)
+    if not hit:
+        return False
+    return (evaluated.matrix_world @ location - Vector(origin_world)).length <= distance_mm / 1000.0
+
+
+def _ring_width_mm(obj: bpy.types.Object, z_mm: float, tolerance_mm: float = 0.08) -> float:
+    points = [
+        obj.matrix_world @ vertex.co
+        for vertex in obj.data.vertices
+        if abs((obj.matrix_world @ vertex.co).z * 1000.0 - z_mm) <= tolerance_mm
+    ]
+    assert points, f"{obj.name} has no geometric profile near Z={z_mm:.1f} mm"
+    return (max(point.x for point in points) - min(point.x for point in points)) * 1000.0
+
+
+def _maximum_profile_turn_degrees(obj: bpy.types.Object, y_mm: float) -> float:
+    """Measure angular faceting along the upper X/Z silhouette at a Y station."""
+    candidates = []
+    for vertex in obj.data.vertices:
+        point = obj.matrix_world @ vertex.co
+        if abs(point.y * 1000.0 - y_mm) <= 0.20 and point.z * 1000.0 >= 39.0:
+            candidates.append((point.x * 1000.0, point.z * 1000.0))
+    points = sorted({(round(x, 3), round(z, 3)) for x, z in candidates})
+    clusters = []
+    for point in points:
+        if not clusters or point[0] - clusters[-1][-1][0] > 0.75:
+            clusters.append([point])
+        else:
+            clusters[-1].append(point)
+    envelope = [
+        (sum(point[0] for point in cluster) / len(cluster), max(point[1] for point in cluster))
+        for cluster in clusters
+    ]
+    upper = []
+    for x, z in envelope:
+        if not upper or z > upper[-1][1] - 2.0:
+            upper.append((x, z))
+    turns = []
+    for first, middle, last in zip(upper, upper[1:], upper[2:]):
+        incoming = Vector((middle[0] - first[0], middle[1] - first[1]))
+        outgoing = Vector((last[0] - middle[0], last[1] - middle[1]))
+        if incoming.length > 0.05 and outgoing.length > 0.05:
+            cosine = max(-1.0, min(1.0, incoming.normalized().dot(outgoing.normalized())))
+            turns.append(degrees(acos(cosine)))
+    assert turns, f"{obj.name} lacks a measurable upper silhouette at Y={y_mm:.1f} mm"
+    return max(turns)
+
+
 front_shell = bpy.data.objects["Z50II-02-001_front_shell"]
 grip_rubber = bpy.data.objects["Z50II-02-002_grip_rubber"]
 chassis = bpy.data.objects["Z50II-01-001_magnesium_chassis"]
@@ -47,14 +109,20 @@ left_cover_minimum, left_cover_maximum = _world_bounds(
 assert (left_cover_minimum.x + left_cover_maximum.x) / 2.0 > 0.045, (
     "photographer-left connector cover must be at positive X"
 )
-exterior_parts = [
-    obj
-    for obj in bpy.data.objects
-    if obj.get("moduleId") in {"01_chassis_front", "02_outer_shell_controls"}
-]
-assert all(obj.matrix_world.determinant() > 0.0 for obj in exterior_parts), (
-    "handedness must be baked into geometry without negative-scale export transforms"
+exterior_collections = tuple(
+    bpy.data.collections[module_id]
+    for module_id in ("01_chassis_front", "02_outer_shell_controls")
 )
+exportable_types = {"MESH", "CURVE", "SURFACE", "META", "FONT", "ARMATURE", "EMPTY"}
+export_objects = {
+    obj for collection in exterior_collections for obj in collection.all_objects
+    if obj.type in exportable_types
+}
+bad_determinants = {
+    obj.name: obj.matrix_world.determinant()
+    for obj in export_objects
+    if not isfinite(obj.matrix_world.determinant()) or obj.matrix_world.determinant() <= 1.0e-9
+}
 
 assert len(grip_rubber.data.vertices) >= 480, "grip loft needs at least ten 48-point stations"
 assert all(polygon.use_smooth for polygon in grip_rubber.data.polygons), "grip loft is not smooth shaded"
@@ -63,6 +131,11 @@ assert all(polygon.use_smooth for polygon in front_shell.data.polygons), "body s
 evf_housing = bpy.data.objects["Z50II_evf_housing"]
 assert len(evf_housing.data.vertices) >= 30, "EVF loft needs more profile stations"
 assert all(polygon.use_smooth for polygon in evf_housing.data.polygons), "EVF shell is not smooth shaded"
+
+palm_width_mm = _ring_width_mm(grip_rubber, 4.0)
+neck_width_mm = _ring_width_mm(grip_rubber, 30.0)
+neck_ratio = neck_width_mm / palm_width_mm
+evf_max_turn = _maximum_profile_turn_degrees(evf_housing, 9.0)
 
 assert _evaluated_volume_ratio(front_shell) < 0.22, "front shell is not a hollow skin"
 assert _evaluated_volume_ratio(grip_rubber) < 0.28, "grip rubber is not a thin ergonomic skin"
@@ -91,6 +164,12 @@ display_pocket = bpy.data.objects.get("Z50II_display_hinge_pocket_reveal")
 assert display_pocket is not None and display_pocket.parent == front_shell, (
     "rear display-hinge pocket/reveal is absent"
 )
+assert not _ray_hits(front_shell, (0.060, 0.030, -0.004), (-1.0, 0.0, 0.0), 13.0), (
+    "rear display-hinge pocket does not pass through the shell edge"
+)
+assert _ray_hits(front_shell, (0.060, 0.030, 0.014), (-1.0, 0.0, 0.0), 13.0), (
+    "display-hinge pocket probe lacks adjacent shell material"
+)
 battery_reveal = bpy.data.objects.get("Z50II_battery_bay_reveal")
 bottom_shell = bpy.data.objects["Z50II-02-004_bottom_shell"]
 battery_door = bpy.data.objects["Z50II-02-007_battery_door"]
@@ -103,6 +182,12 @@ assert bottom_shell.modifiers and bottom_shell.modifiers[-1].type == "BEVEL", (
 assert _world_bounds(battery_door)[1].z <= _world_bounds(bottom_shell)[1].z + 0.0006, (
     "battery door is not seated in the bottom-shell opening"
 )
+assert not _ray_hits(bottom_shell, (-0.035, 0.017, -0.045), (0.0, 0.0, 1.0), 12.0), (
+    "battery-bay opening does not pass through the bottom shell"
+)
+assert _ray_hits(bottom_shell, (0.000, 0.017, -0.045), (0.0, 0.0, 1.0), 12.0), (
+    "battery-bay opening probe lacks adjacent bottom-shell material"
+)
 
 fn1 = bpy.data.objects["Z50II-02-016_fn1_button"]
 fn2 = bpy.data.objects["Z50II-02-017_fn2_button"]
@@ -112,7 +197,16 @@ assert abs(fn1.location.x - fn2.location.x) < 0.001, "Fn buttons are not vertica
 assert fn1.location.z > fn2.location.z, "Fn1 must sit above Fn2"
 assert bpy.data.objects.get("Z50II_fn1_pill_seat") is not None
 assert bpy.data.objects.get("Z50II_fn2_pill_seat") is not None
-assert bpy.data.objects.get("Z50II_shutter_power_receiving_seat") is not None
+fn1_bore_open = not _ray_hits(front_shell, (-0.032, -0.005, 0.008), (0.0, 1.0, 0.0), 10.0)
+fn1_adjacent_shell = _ray_hits(front_shell, (-0.040, -0.005, 0.008), (0.0, 1.0, 0.0), 10.0)
+shutter_seat = bpy.data.objects.get("Z50II_shutter_power_receiving_seat")
+assert shutter_seat is not None
+assert not _ray_hits(shutter_seat, (-0.049, -0.003, 0.036), (0.0, 0.0, -1.0), 8.0), (
+    "shutter/power receiving seat lacks a genuine center opening"
+)
+assert _ray_hits(shutter_seat, (-0.054, -0.003, 0.036), (0.0, 0.0, -1.0), 8.0), (
+    "shutter/power receiving seat lacks an annular seating surface"
+)
 
 for cut_object_name in (
     "Z50II-02-001_front_shell",
@@ -124,4 +218,22 @@ for cut_object_name in (
         f"{cut_object_name} lacks post-cut bevel treatment"
     )
 
-print("Exterior detail contract passed")
+assert evf_max_turn <= 18.0, (
+    f"EVF crown remains visibly polygonal: maximum profile turn={evf_max_turn:.2f} degrees"
+)
+assert neck_ratio >= 0.82, (
+    f"grip shoulder neck is too narrow/bulbous: neck={neck_width_mm:.2f} mm, "
+    f"palm={palm_width_mm:.2f} mm, ratio={neck_ratio:.3f}"
+)
+assert fn1_bore_open, "Fn1 bore does not pass through the front shell"
+assert fn1_adjacent_shell, "Fn1 bore probe lacks adjacent front-shell material"
+assert not bad_determinants, (
+    f"all {len(export_objects)} exterior export nodes must have finite positive determinant; "
+    f"bad={len(bad_determinants)}: {bad_determinants}"
+)
+
+print(
+    "Exterior detail contract passed: "
+    f"export_nodes={len(export_objects)}, bad_determinants={len(bad_determinants)}, "
+    f"grip_neck_ratio={neck_ratio:.3f}, evf_max_turn_deg={evf_max_turn:.2f}"
+)

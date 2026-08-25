@@ -5,6 +5,7 @@ from __future__ import annotations
 from math import radians
 
 import bpy
+from mathutils import Matrix
 
 from z50ii.geometry import cylinder, rounded_box, torus
 from z50ii.materials import get_material
@@ -62,13 +63,33 @@ def _annotate(obj, part_id, description_zh, description_en):
     )
 
 
-def _mirror_selectable_hierarchies_x(collection: bpy.types.Collection) -> None:
-    for obj in [candidate for candidate in collection.objects if candidate.get("partId")]:
-        obj.location.x = -obj.location.x
-        obj.scale.x = -obj.scale.x
-        bpy.ops.object.select_all(action="DESELECT")
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
+def _mirror_export_hierarchy_x(collection: bpy.types.Collection) -> None:
+    reflection = Matrix.Diagonal((-1.0, 1.0, 1.0, 1.0))
+    objects = list(collection.all_objects)
+    parents = {obj: obj.parent if obj.parent in objects else None for obj in objects}
+    source_world = {obj: obj.matrix_world.copy() for obj in objects}
+
+    for obj in objects:
+        obj.parent = None
+        obj.matrix_world = source_world[obj]
+
+    for obj in objects:
+        obj.matrix_world = reflection @ source_world[obj]
+        if obj.type in {"MESH", "CURVE", "SURFACE", "META", "FONT", "ARMATURE"}:
+            bpy.ops.object.select_all(action="DESELECT")
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        else:
+            obj.matrix_world = obj.matrix_world @ reflection
+
+    reflected_world = {obj: obj.matrix_world.copy() for obj in objects}
+    for obj in objects:
+        parent = parents[obj]
+        if parent is not None:
+            obj.parent = parent
+            obj.matrix_parent_inverse = parent.matrix_world.inverted()
+            obj.matrix_world = reflected_world[obj]
         bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
 
@@ -155,7 +176,7 @@ def build_chassis_front() -> list[bpy.types.Object]:
     _rail("Z50II_strap_reinforcement_right_web", (13, 2, 2), (56, 11, 15), 0.45, collection, dark, left_reinforcement, 30)
     _annotate(left_reinforcement, "Z50II-01-008", "左右肩带眼载荷位置的成对安装柱与斜撑参考件。", "Paired reference mounting posts and diagonal webs at the strap-eyelet load paths.")
 
-    _mirror_selectable_hierarchies_x(collection)
+    _mirror_export_hierarchy_x(collection)
 
     return [chassis, front_frame, grip_frame, mount_plate, sensor_top, bottom_plate, tripod_socket, left_reinforcement]
 

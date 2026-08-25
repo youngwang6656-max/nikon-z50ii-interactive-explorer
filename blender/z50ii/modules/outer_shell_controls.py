@@ -5,6 +5,7 @@ from __future__ import annotations
 from math import cos, pi, radians, sin
 
 import bpy
+from mathutils import Matrix
 
 from z50ii.constants import mm
 from z50ii.geometry import cylinder, rounded_box, torus
@@ -123,14 +124,16 @@ def _loft_grip_skin(name, collection, material) -> bpy.types.Object:
         (-38.0, 53.0, -14.0, 15.0, 13.0),
         (-34.0, 53.4, -14.5, 15.5, 15.0),
         (-28.0, 54.0, -15.0, 15.8, 17.0),
-        (-18.0, 55.0, -15.0, 15.0, 17.0),
-        (-7.0, 56.0, -14.5, 14.0, 17.5),
-        (4.0, 56.0, -13.5, 14.0, 17.0),
-        (14.0, 55.5, -12.0, 14.2, 14.5),
-        (22.0, 54.0, -9.5, 13.5, 11.0),
-        (27.0, 52.0, -6.0, 12.0, 7.5),
-        (30.0, 50.0, -3.0, 10.0, 5.0),
-        (31.0, 49.5, -1.5, 9.0, 4.5),
+        (-20.0, 54.8, -15.2, 15.6, 17.6),
+        (-11.0, 55.5, -14.9, 15.0, 17.9),
+        (-3.0, 55.9, -14.3, 14.6, 17.7),
+        (4.0, 56.0, -13.5, 14.5, 17.0),
+        (11.0, 55.7, -12.4, 14.5, 15.8),
+        (17.0, 55.2, -10.8, 14.6, 14.3),
+        (22.0, 54.3, -8.7, 14.5, 12.5),
+        (26.0, 53.0, -6.3, 14.0, 10.3),
+        (30.0, 50.7, -3.0, 12.0, 7.2),
+        (32.0, 49.0, -1.0, 11.5, 5.3),
     )
     segments = 64
     vertices = []
@@ -197,17 +200,18 @@ def _pill_prism_y(
 
 
 def _pill_cut(target, name, width_mm, height_mm, depth_mm, location_mm, collection):
-    cutter = _pill_prism_y(
-        name,
-        width_mm,
-        height_mm,
-        depth_mm,
-        location_mm,
-        collection,
-        None,
-        bevel_mm=0.45,
-    )
-    _boolean_difference(target, cutter, f"{name}_difference")
+    x, y, z = location_mm
+    straight = max(0.0, (height_mm - width_mm) / 2.0)
+    _box_cut(target, f"{name}_web", (width_mm, depth_mm, height_mm - width_mm), location_mm)
+    for suffix, z_offset in (("upper", straight), ("lower", -straight)):
+        _round_cut(
+            target,
+            f"{name}_{suffix}",
+            width_mm / 2.0,
+            depth_mm,
+            (x, y, z + z_offset),
+            (90, 0, 0),
+        )
 
 
 def _pill_seat(name, width_mm, height_mm, location_mm, collection, material, parent):
@@ -225,14 +229,39 @@ def _pill_seat(name, width_mm, height_mm, location_mm, collection, material, par
     return _parent(seat, parent)
 
 
-def _mirror_selectable_hierarchies_x(collection: bpy.types.Collection) -> None:
-    """Mirror assembled part hierarchies into the project's front-view handedness."""
-    for obj in [candidate for candidate in collection.objects if candidate.get("partId")]:
-        obj.location.x = -obj.location.x
-        obj.scale.x = -obj.scale.x
-        bpy.ops.object.select_all(action="DESELECT")
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
+def _mirror_export_hierarchy_x(collection: bpy.types.Collection) -> None:
+    """Reflect every export node across X and bake meshes to proper transforms."""
+    reflection = Matrix.Diagonal((-1.0, 1.0, 1.0, 1.0))
+    objects = list(collection.all_objects)
+    parents = {obj: obj.parent if obj.parent in objects else None for obj in objects}
+    source_world = {obj: obj.matrix_world.copy() for obj in objects}
+
+    # Work in world space so a child is reflected exactly once, independent of
+    # its parent's transform. Re-parenting below restores the logical hierarchy.
+    for obj in objects:
+        obj.parent = None
+        obj.matrix_world = source_world[obj]
+
+    for obj in objects:
+        obj.matrix_world = reflection @ source_world[obj]
+        if obj.type in {"MESH", "CURVE", "SURFACE", "META", "FONT", "ARMATURE"}:
+            bpy.ops.object.select_all(action="DESELECT")
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        else:
+            # An empty has no geometry into which a reflection can be baked.
+            # Conjugating its basis preserves the reflected anchor position and
+            # yields a proper coordinate frame for downstream decal projection.
+            obj.matrix_world = obj.matrix_world @ reflection
+
+    reflected_world = {obj: obj.matrix_world.copy() for obj in objects}
+    for obj in objects:
+        parent = parents[obj]
+        if parent is not None:
+            obj.parent = parent
+            obj.matrix_parent_inverse = parent.matrix_world.inverted()
+            obj.matrix_world = reflected_world[obj]
         bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
 
@@ -412,8 +441,8 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         cap_back=False,
     )
     _round_cut(front_shell, "reserved_z_mount_opening_55mm", 27.5, 7.0, (0, 1.5, 0), (90, 0, 0))
-    _pill_cut(front_shell, "fn1_pill_bore", 5.9, 9.9, 5.0, (32, 0.6, 8), collection)
-    _pill_cut(front_shell, "fn2_pill_bore", 5.7, 9.5, 5.0, (32, 0.6, -3.5), collection)
+    _pill_cut(front_shell, "fn1_pill_bore", 5.9, 9.9, 20.0, (32, 0.6, 8), collection)
+    _pill_cut(front_shell, "fn2_pill_bore", 5.7, 9.5, 20.0, (32, 0.6, -3.5), collection)
     _round_cut(front_shell, "lens_release_bore", 3.6, 5.0, (25, 0.6, 7), (90, 0, 0))
     _box_cut(front_shell, "rear_display_hinge_pocket", (7.0, 7.0, 25.0), (-53.0, 30.0, -4.0))
     _post_cut_finish(front_shell, 0.45)
@@ -498,34 +527,25 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         cap_front=True,
         cap_back=True,
     )
-    evf_front = (
-        (-22, 37), (-21, 42), (-18, 49), (-14, 53), (-9, 54.5),
-        (3, 54.5), (8, 52.5), (12, 48), (15, 41), (15, 37),
-    )
-    evf_front_mid = (
-        (-21.8, 37), (-20.8, 43), (-17.3, 50.5), (-13, 54.5), (-8.5, 55.7),
-        (2.8, 55.7), (7.7, 54), (11.7, 49), (14.7, 42), (14.7, 37),
-    )
-    evf_mid = (
-        (-21.5, 37), (-20, 44), (-16, 52), (-11, 56), (-7, 56.92),
-        (2, 56.92), (7, 55), (11, 50), (14, 42), (14, 37),
-    )
-    evf_rear_mid = (
-        (-20.5, 37), (-19, 43), (-15.5, 50.5), (-11, 54), (-7, 55),
-        (2, 55), (6.8, 53.2), (10.5, 48.5), (13.2, 41.5), (13.2, 37),
-    )
-    evf_rear = (
-        (-19, 37), (-18, 42), (-14, 48.5), (-10, 51.5), (-6, 52.2),
-        (2, 52.2), (6.5, 50.5), (9.5, 47), (12, 41), (12, 37),
-    )
+    def evf_profile(center_x, width, height, samples=25):
+        return tuple(
+            (
+                center_x + width * 0.5 * cos(pi - pi * index / (samples - 1)),
+                37.0 + height * sin(pi * index / (samples - 1)) ** 0.55,
+            )
+            for index in range(samples)
+        )
+
     evf = _profile_shell_y(
         "Z50II_evf_housing",
         (
-            (9.0, evf_front),
-            (14.0, evf_front_mid),
-            (21.0, evf_mid),
-            (28.0, evf_rear_mid),
-            (34.0, evf_rear),
+            (9.0, evf_profile(-3.5, 37.0, 18.0)),
+            (13.0, evf_profile(-3.5, 36.8, 18.9)),
+            (17.0, evf_profile(-3.5, 36.2, 19.6)),
+            (21.0, evf_profile(-3.5, 35.5, 19.92)),
+            (25.0, evf_profile(-3.5, 34.7, 19.3)),
+            (29.5, evf_profile(-3.5, 33.2, 17.8)),
+            (34.0, evf_profile(-3.5, 31.0, 15.2)),
         ),
         collection,
         shell,
@@ -676,7 +696,7 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
     right_lug = torus("Z50II-02-020_right_strap_lug", 4.0, 1.2, (68.8, 11, 20), (0, 90, 0), collection, metal)
     _annotate(right_lug, "Z50II-02-020", "具有贯通眼孔的右侧金属肩带环参考件。", "Reference right metal strap eyelet with a true open hole.")
 
-    _mirror_selectable_hierarchies_x(collection)
+    _mirror_export_hierarchy_x(collection)
 
     return [
         front_shell, grip_rubber, top_shell, bottom_shell, left_cover, right_cover,
