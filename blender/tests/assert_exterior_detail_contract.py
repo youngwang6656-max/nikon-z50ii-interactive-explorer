@@ -2,7 +2,7 @@
 
 import bmesh
 import bpy
-from math import acos, degrees, isfinite
+from math import acos, atan2, degrees, isfinite
 from mathutils import Vector
 
 
@@ -91,6 +91,63 @@ def _maximum_profile_turn_degrees(obj: bpy.types.Object, y_mm: float) -> float:
     return max(turns)
 
 
+def _evaluated_evf_crown_metrics(
+    obj: bpy.types.Object, y_mm: float
+) -> tuple[float, float, float]:
+    """Measure the rendered front crown, not source-profile bookkeeping."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated = obj.evaluated_get(depsgraph)
+    mesh = evaluated.to_mesh()
+    try:
+        candidates = []
+        for vertex in mesh.vertices:
+            point = evaluated.matrix_world @ vertex.co
+            if abs(point.y * 1000.0 - y_mm) <= 2.50 and point.z * 1000.0 >= 36.0:
+                candidates.append((point.x * 1000.0, point.z * 1000.0))
+    finally:
+        evaluated.to_mesh_clear()
+
+    points = sorted({(round(x, 3), round(z, 3)) for x, z in candidates})
+    assert points, "EVF evaluated crown profile is empty"
+    minimum_sample_x = points[0][0]
+    buckets = {}
+    for point in points:
+        bucket = int((point[0] - minimum_sample_x) / 0.50)
+        buckets.setdefault(bucket, []).append(point)
+    envelope = [
+        (sum(point[0] for point in bucket) / len(bucket), max(point[1] for point in bucket))
+        for _index, bucket in sorted(buckets.items())
+    ]
+    assert len(envelope) >= 20, "EVF evaluated crown has too few geometric samples"
+
+    def interpolate_z(x_target: float) -> float:
+        for left, right in zip(envelope, envelope[1:]):
+            if left[0] <= x_target <= right[0]:
+                fraction = (x_target - left[0]) / (right[0] - left[0])
+                return left[1] + fraction * (right[1] - left[1])
+        raise AssertionError(f"EVF crown does not span X={x_target:.2f} mm")
+
+    minimum_x = min(point[0] for point in points)
+    maximum_x = max(point[0] for point in points)
+    base_z = min(point[1] for point in points)
+    crown_z = max(point[1] for point in envelope)
+    width = maximum_x - minimum_x
+    height = crown_z - base_z
+    center_x = (minimum_x + maximum_x) / 2.0
+    crown_drop = crown_z - min(
+        interpolate_z(center_x - width * 0.20),
+        interpolate_z(center_x + width * 0.20),
+    )
+    shoulder_angles = []
+    for edge, sign in ((minimum_x, 1.0), (maximum_x, -1.0)):
+        lower_x = edge + sign * width * 0.02
+        upper_x = edge + sign * width * 0.16
+        run = abs(upper_x - lower_x)
+        rise = interpolate_z(upper_x) - interpolate_z(lower_x)
+        shoulder_angles.append(degrees(atan2(rise, run)))
+    return width / height, crown_drop, min(shoulder_angles)
+
+
 front_shell = bpy.data.objects["Z50II-02-001_front_shell"]
 grip_rubber = bpy.data.objects["Z50II-02-002_grip_rubber"]
 chassis = bpy.data.objects["Z50II-01-001_magnesium_chassis"]
@@ -136,6 +193,9 @@ palm_width_mm = _ring_width_mm(grip_rubber, 4.0)
 neck_width_mm = _ring_width_mm(grip_rubber, 30.0)
 neck_ratio = neck_width_mm / palm_width_mm
 evf_max_turn = _maximum_profile_turn_degrees(evf_housing, 9.0)
+evf_width_height, evf_crown_drop_mm, evf_shoulder_slope_deg = _evaluated_evf_crown_metrics(
+    evf_housing, 9.0
+)
 
 assert _evaluated_volume_ratio(front_shell) < 0.22, "front shell is not a hollow skin"
 assert _evaluated_volume_ratio(grip_rubber) < 0.28, "grip rubber is not a thin ergonomic skin"
@@ -221,6 +281,15 @@ for cut_object_name in (
 assert evf_max_turn <= 18.0, (
     f"EVF crown remains visibly polygonal: maximum profile turn={evf_max_turn:.2f} degrees"
 )
+assert evf_width_height >= 2.55, (
+    f"EVF housing is too tall/domed: evaluated width/height={evf_width_height:.3f}"
+)
+assert evf_crown_drop_mm <= 0.55, (
+    f"EVF crown is not flat enough: central 40% drop={evf_crown_drop_mm:.3f} mm"
+)
+assert 38.0 <= evf_shoulder_slope_deg <= 65.0, (
+    f"EVF shoulder slope is not controlled: minimum={evf_shoulder_slope_deg:.2f} degrees"
+)
 assert neck_ratio >= 0.82, (
     f"grip shoulder neck is too narrow/bulbous: neck={neck_width_mm:.2f} mm, "
     f"palm={palm_width_mm:.2f} mm, ratio={neck_ratio:.3f}"
@@ -235,5 +304,7 @@ assert not bad_determinants, (
 print(
     "Exterior detail contract passed: "
     f"export_nodes={len(export_objects)}, bad_determinants={len(bad_determinants)}, "
-    f"grip_neck_ratio={neck_ratio:.3f}, evf_max_turn_deg={evf_max_turn:.2f}"
+    f"grip_neck_ratio={neck_ratio:.3f}, evf_max_turn_deg={evf_max_turn:.2f}, "
+    f"evf_width_height={evf_width_height:.3f}, evf_crown_drop_mm={evf_crown_drop_mm:.3f}, "
+    f"evf_shoulder_slope_deg={evf_shoulder_slope_deg:.2f}"
 )

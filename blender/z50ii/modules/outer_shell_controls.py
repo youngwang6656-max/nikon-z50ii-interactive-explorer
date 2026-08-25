@@ -527,25 +527,36 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         cap_front=True,
         cap_back=True,
     )
-    def evf_profile(center_x, width, height, samples=25):
+    evf_crown_shape = (
+        (-1.00, 0.00), (-0.99, 0.10), (-0.97, 0.18), (-0.93, 0.26),
+        (-0.88, 0.36), (-0.82, 0.46), (-0.75, 0.56), (-0.68, 0.66),
+        (-0.60, 0.76), (-0.52, 0.85), (-0.48, 0.90), (-0.44, 0.943),
+        (-0.40, 0.975), (-0.36, 0.991), (-0.31, 0.998), (-0.25, 1.00),
+        (-0.18, 1.00), (0.00, 1.00), (0.18, 1.00), (0.25, 1.00),
+        (0.31, 0.998), (0.36, 0.991), (0.40, 0.975), (0.44, 0.943),
+        (0.48, 0.90), (0.52, 0.85),
+        (0.60, 0.76), (0.68, 0.66), (0.75, 0.56), (0.82, 0.46),
+        (0.88, 0.36), (0.93, 0.26), (0.97, 0.18), (0.99, 0.10),
+        (1.00, 0.00),
+    )
+
+    def evf_profile(center_x, width, crown_z):
+        height = crown_z - 37.0
         return tuple(
-            (
-                center_x + width * 0.5 * cos(pi - pi * index / (samples - 1)),
-                37.0 + height * sin(pi * index / (samples - 1)) ** 0.55,
-            )
-            for index in range(samples)
+            (center_x + width * 0.5 * x_fraction, 37.0 + height * z_fraction)
+            for x_fraction, z_fraction in evf_crown_shape
         )
 
     evf = _profile_shell_y(
         "Z50II_evf_housing",
         (
-            (9.0, evf_profile(-3.5, 37.0, 18.0)),
-            (13.0, evf_profile(-3.5, 36.8, 18.9)),
-            (17.0, evf_profile(-3.5, 36.2, 19.6)),
-            (21.0, evf_profile(-3.5, 35.5, 19.92)),
-            (25.0, evf_profile(-3.5, 34.7, 19.3)),
-            (29.5, evf_profile(-3.5, 33.2, 17.8)),
-            (34.0, evf_profile(-3.5, 31.0, 15.2)),
+            (9.0, evf_profile(-3.5, 45.0, 54.2)),
+            (10.5, evf_profile(-3.5, 45.0, 54.2)),
+            (15.0, evf_profile(-3.5, 44.5, 54.6)),
+            (21.0, evf_profile(-3.5, 43.5, 54.8)),
+            (27.0, evf_profile(-3.5, 42.0, 54.0)),
+            (32.5, evf_profile(-3.5, 39.0, 52.8)),
+            (34.0, evf_profile(-3.5, 39.0, 52.8)),
         ),
         collection,
         shell,
