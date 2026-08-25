@@ -17,26 +17,26 @@ MODULE_ID = "02_outer_shell_controls"
 
 
 PART_META = {
-    "Z50II-02-001": ("", "前壳", "Front shell", 8, (0, -1, 0), 55, ("Z50II-02-003",)),
-    "Z50II-02-002": ("Z50II-02-001", "握柄橡胶", "Grip rubber", 9, (0, -1, 0), 38, ("Z50II-02-001", "Z50II-02-006")),
-    "Z50II-02-003": ("Z50II-02-001", "顶壳", "Top shell", 7, (0, 0, 1), 42, ("Z50II-02-005", "Z50II-02-006")),
-    "Z50II-02-004": ("Z50II-02-001", "底壳", "Bottom shell", 4, (0, 0, -1), 35, ("Z50II-02-007",)),
-    "Z50II-02-005": ("Z50II-02-001", "左侧盖", "Left side cover", 5, (1, 0, 0), 30, ("Z50II-02-004", "Z50II-02-008", "Z50II-02-009")),
-    "Z50II-02-006": ("Z50II-02-001", "右握柄盖", "Right grip cover", 6, (-1, 0, 0), 34, ("Z50II-02-004",)),
-    "Z50II-02-007": ("Z50II-02-004", "电池舱门", "Battery door", 1, (0, 0, -1), 24, ()),
+    "Z50II-02-001": ("", "前壳", "Front shell", 17, (0, -1, 0), 55, ("Z50II-02-002", "Z50II-02-003", "Z50II-02-004", "Z50II-02-005", "Z50II-02-006")),
+    "Z50II-02-002": ("Z50II-02-001", "握柄橡胶", "Grip rubber", 16, (0, -1, 0), 38, ("Z50II-02-006", "Z50II-02-010", "Z50II-02-011", "Z50II-02-012")),
+    "Z50II-02-003": ("Z50II-02-001", "顶壳", "Top shell", 15, (0, 0, 1), 42, ("Z50II-02-013", "Z50II-02-014", "Z50II-02-015", "Z50II-06-006", "Z50II-06-009", "Z50II-08-011", "Z50II-08-012")),
+    "Z50II-02-004": ("Z50II-02-001", "底壳", "Bottom shell", 14, (0, 0, -1), 35, ("Z50II-02-007", "Z50II-05-007", "Z50II-08-015", "Z50II-08-016")),
+    "Z50II-02-005": ("Z50II-02-001", "左侧盖", "Left side cover", 12, (1, 0, 0), 30, ("Z50II-02-008", "Z50II-02-009", "Z50II-08-011", "Z50II-08-013")),
+    "Z50II-02-006": ("Z50II-02-001", "右握柄盖", "Right grip cover", 13, (-1, 0, 0), 34, ("Z50II-02-020", "Z50II-08-012", "Z50II-08-014")),
+    "Z50II-02-007": ("Z50II-02-004", "电池舱门", "Battery door", 2, (0, 0, -1), 24, ()),
     "Z50II-02-008": ("Z50II-02-005", "上接口舱门", "Upper port door", 2, (1, 0, 0), 22, ()),
-    "Z50II-02-009": ("Z50II-02-005", "下接口舱门", "Lower port door", 3, (1, 0, 0), 22, ()),
-    "Z50II-02-010": ("Z50II-02-002", "快门释放按钮", "Shutter-release button", 12, (0, 0, 1), 18, ("Z50II-02-002",)),
-    "Z50II-02-011": ("Z50II-02-010", "电源环", "Power collar", 13, (0, 0, 1), 18, ("Z50II-02-010",)),
-    "Z50II-02-012": ("Z50II-02-002", "前指令拨轮", "Front command dial", 14, (-1, 0, 0), 20, ("Z50II-02-002",)),
-    "Z50II-02-013": ("Z50II-02-003", "后指令拨轮", "Rear command dial", 15, (-1, 0, 0), 20, ("Z50II-02-003",)),
-    "Z50II-02-014": ("Z50II-02-003", "模式拨盘", "Mode dial", 16, (0, 0, 1), 22, ("Z50II-02-003",)),
-    "Z50II-02-015": ("Z50II-02-003", "照片／视频选择器", "Photo/video selector", 17, (0, 1, 0), 18, ("Z50II-02-003",)),
-    "Z50II-02-016": ("Z50II-02-001", "Fn1按钮", "Fn1 button", 18, (0, -1, 0), 16, ("Z50II-02-001",)),
-    "Z50II-02-017": ("Z50II-02-001", "Fn2按钮", "Fn2 button", 19, (0, -1, 0), 16, ("Z50II-02-016",)),
-    "Z50II-02-018": ("Z50II-02-001", "镜头释放按钮", "Lens-release button", 20, (0, -1, 0), 16, ("Z50II-02-001",)),
-    "Z50II-02-019": ("Z50II-02-005", "左肩带环", "Left strap lug", 10, (1, 0, 0), 24, ("Z50II-02-005",)),
-    "Z50II-02-020": ("Z50II-02-006", "右肩带环", "Right strap lug", 11, (-1, 0, 0), 24, ("Z50II-02-006",)),
+    "Z50II-02-009": ("Z50II-02-005", "下接口舱门", "Lower port door", 2, (1, 0, 0), 22, ()),
+    "Z50II-02-010": ("Z50II-02-002", "快门释放按钮", "Shutter-release button", 3, (0, 0, 1), 18, ()),
+    "Z50II-02-011": ("Z50II-02-010", "电源环", "Power collar", 4, (0, 0, 1), 18, ("Z50II-02-010",)),
+    "Z50II-02-012": ("Z50II-02-002", "前指令拨轮", "Front command dial", 4, (-1, 0, 0), 20, ()),
+    "Z50II-02-013": ("Z50II-02-003", "后指令拨轮", "Rear command dial", 4, (-1, 0, 0), 20, ()),
+    "Z50II-02-014": ("Z50II-02-003", "模式拨盘", "Mode dial", 4, (0, 0, 1), 22, ()),
+    "Z50II-02-015": ("Z50II-02-003", "照片／视频选择器", "Photo/video selector", 3, (0, 1, 0), 18, ()),
+    "Z50II-02-016": ("Z50II-02-001", "Fn1按钮", "Fn1 button", 3, (0, -1, 0), 16, ()),
+    "Z50II-02-017": ("Z50II-02-001", "Fn2按钮", "Fn2 button", 4, (0, -1, 0), 16, ("Z50II-02-016",)),
+    "Z50II-02-018": ("Z50II-02-001", "镜头释放按钮", "Lens-release button", 3, (0, -1, 0), 16, ()),
+    "Z50II-02-019": ("Z50II-02-005", "左肩带环", "Left strap lug", 4, (1, 0, 0), 24, ()),
+    "Z50II-02-020": ("Z50II-02-006", "右肩带环", "Right strap lug", 4, (-1, 0, 0), 24, ()),
 }
 
 
@@ -448,6 +448,8 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
     # card have a real vertical service path after the door is removed. Source
     # +X is photographer-right after the final handedness reflection.
     _box_cut(front_shell, "battery_card_vertical_chute", (33.0, 28.0, 48.0), (35.0, 17.0, -16.0))
+    _box_cut(front_shell, "upper_port_service_tunnel", (12.0, 15.0, 17.0), (-53.0, 16.0, 10.0))
+    _box_cut(front_shell, "lower_port_service_tunnel", (12.0, 15.0, 18.0), (-53.0, 16.0, -10.0))
     _pill_cut(front_shell, "fn1_pill_bore", 5.9, 9.9, 20.0, (35, 0.6, 8), collection)
     _pill_cut(front_shell, "fn2_pill_bore", 5.7, 9.5, 20.0, (35, 0.6, -3.5), collection)
     _round_cut(front_shell, "lens_release_bore", 3.6, 5.0, (34.5, 0.6, 7), (90, 0, 0))
@@ -598,8 +600,7 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
     _box_cut(evf, "evf_viewing_aperture", (17.0, 5.0, 8.0), (-5, 33.2, 45))
     _post_cut_finish(evf, 0.4)
     _parent(evf, top_shell)
-    _parent(rounded_box("Z50II_evf_eyepiece_glass", (15, 0.8, 6.5), (-5, 32.0, 45), 1.4, collection, glass), top_shell)
-    _parent(rounded_box("Z50II_hot_shoe_land", (15, 13, 1.3), (-4, 22, 38.6), 0.35, collection, metal), top_shell)
+    _parent(rounded_box("Z50II_hot_shoe_land", (15, 7, 1.3), (-4, 30.5, 54.2), 0.35, collection, metal), top_shell)
     _annotate(top_shell, "Z50II-02-003", "带斜肩、复合EVF隆起与热靴安装面的薄壁顶壳参考件。", "Thin profiled top shell with sloped shoulders, compound EVF hump, and hot-shoe land.")
 
     bottom_shell = _bottom_plate(

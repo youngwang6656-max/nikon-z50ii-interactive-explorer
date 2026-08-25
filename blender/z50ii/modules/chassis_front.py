@@ -16,14 +16,14 @@ MODULE_ID = "01_chassis_front"
 
 
 PART_META = {
-    "Z50II-01-001": ("", "镁合金主机架", "Magnesium chassis", 35, (0, 1, 0), 42, ("Z50II-01-003", "Z50II-01-005", "Z50II-01-007", "Z50II-01-008")),
-    "Z50II-01-002": ("Z50II-01-001", "前部内框", "Front inner frame", 33, (0, -1, 0), 32, ("Z50II-01-004",)),
-    "Z50II-01-003": ("Z50II-01-001", "握柄内框", "Grip inner frame", 29, (-1, 0, 0), 35, ("Z50II-02-002", "Z50II-02-006")),
-    "Z50II-01-004": ("Z50II-01-002", "卡口支撑板", "Mount support plate", 32, (0, -1, 0), 30, ("Z50II-02-001",)),
-    "Z50II-01-005": ("Z50II-01-001", "传感器导轨框", "Sensor rail frame", 34, (0, 1, 0), 34, ("Z50II-01-002",)),
-    "Z50II-01-006": ("Z50II-01-001", "底部加强板", "Bottom reinforcement plate", 30, (0, 0, -1), 28, ("Z50II-02-004", "Z50II-02-007")),
-    "Z50II-01-007": ("Z50II-01-006", "三脚架接口座", "Tripod socket", 31, (0, 0, -1), 22, ("Z50II-01-006",)),
-    "Z50II-01-008": ("Z50II-01-001", "肩带环加强件（成对）", "Strap-lug reinforcement pair", 28, (0, 1, 0), 24, ("Z50II-02-019", "Z50II-02-020")),
+    "Z50II-01-001": ("", "镁合金主机架", "Magnesium chassis", 40, (0, 1, 0), 42, ("Z50II-01-003", "Z50II-01-005", "Z50II-01-007", "Z50II-01-008")),
+    "Z50II-01-002": ("Z50II-01-001", "前部内框", "Front inner frame", 39, (0, -1, 0), 32, ("Z50II-01-004",)),
+    "Z50II-01-003": ("Z50II-01-001", "握柄内框", "Grip inner frame", 39, (-1, 0, 0), 35, ("Z50II-02-002", "Z50II-02-006")),
+    "Z50II-01-004": ("Z50II-01-002", "卡口支撑板", "Mount support plate", 38, (0, -1, 0), 30, ("Z50II-02-001",)),
+    "Z50II-01-005": ("Z50II-01-001", "传感器导轨框", "Sensor rail frame", 39, (0, 1, 0), 34, ("Z50II-03-011",)),
+    "Z50II-01-006": ("Z50II-01-001", "底部加强板", "Bottom reinforcement plate", 38, (0, 0, -1), 28, ("Z50II-02-004", "Z50II-05-004")),
+    "Z50II-01-007": ("Z50II-01-006", "三脚架接口座", "Tripod socket", 39, (0, 0, -1), 22, ("Z50II-01-006",)),
+    "Z50II-01-008": ("Z50II-01-001", "肩带环加强件（成对）", "Strap-lug reinforcement pair", 39, (0, 1, 0), 24, ("Z50II-02-019", "Z50II-02-020")),
 }
 
 
@@ -186,10 +186,10 @@ def build_chassis_front() -> list[bpy.types.Object]:
         _parent(web, tripod_socket)
     _annotate(tripod_socket, "Z50II-01-007", "由金属接口、环形安装面与四向加强肋组成的参考三脚架座。", "Reference tripod socket with metal insert, annular land, and four reinforcing webs.")
 
-    left_reinforcement = rounded_box("Z50II-01-008_strap_lug_reinforcement_pair", (2.5, 7, 12), (-52.5, 11, 20), 0.65, collection, dark)
-    _parent(rounded_box("Z50II-01-008_strap_lug_reinforcement_right", (2.5, 7, 12), (61.5, 11, 20), 0.65, collection, dark), left_reinforcement)
-    _rail("Z50II_strap_reinforcement_left_web", (13, 2, 2), (-47, 11, 15), 0.45, collection, dark, left_reinforcement, -30)
-    _rail("Z50II_strap_reinforcement_right_web", (13, 2, 2), (56, 11, 15), 0.45, collection, dark, left_reinforcement, 30)
+    left_reinforcement = rounded_box("Z50II-01-008_strap_lug_reinforcement_pair", (2.5, 7, 10), (-52.5, 11, 21), 0.65, collection, dark)
+    _parent(rounded_box("Z50II-01-008_strap_lug_reinforcement_right", (2.5, 7, 10), (61.5, 11, 21), 0.65, collection, dark), left_reinforcement)
+    _rail("Z50II_strap_reinforcement_left_web", (13, 2, 2), (-47, 11, 25), 0.45, collection, dark, left_reinforcement, -30)
+    _rail("Z50II_strap_reinforcement_right_web", (13, 2, 2), (56, 11, 25), 0.45, collection, dark, left_reinforcement, 30)
     _annotate(left_reinforcement, "Z50II-01-008", "左右肩带眼载荷位置的成对安装柱与斜撑参考件。", "Paired reference mounting posts and diagonal webs at the strap-eyelet load paths.")
 
     _mirror_export_hierarchy_x(collection)

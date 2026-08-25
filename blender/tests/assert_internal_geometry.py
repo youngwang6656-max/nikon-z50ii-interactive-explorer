@@ -177,13 +177,19 @@ for first_id, second_id in (
 for consumable_id in ("Z50II-05-001", "Z50II-05-006"):
     assert "Z50II-02-007" in dependency_closure(parts[consumable_id])
     assert "Z50II-02-004" not in dependency_closure(parts[consumable_id])
-for service_id in ("Z50II-05-002", "Z50II-05-003", "Z50II-05-004", "Z50II-05-005", "Z50II-05-007", "Z50II-05-008"):
+for service_id in ("Z50II-05-002", "Z50II-05-003", "Z50II-05-004", "Z50II-05-005", "Z50II-05-008"):
     assert "Z50II-02-004" in dependency_closure(parts[service_id])
+assert tuple(parts["Z50II-05-007"]["dependsOn"]) == ("Z50II-02-007",)
+assert parts["Z50II-05-007"]["step"] < parts["Z50II-02-004"]["step"]
 
 power_storage_ids = tuple(f"Z50II-05-{index:03d}" for index in range(1, 9))
+legacy_service_ids = set(internal_ids) | set(retained_ids)
 for moving_id in power_storage_ids:
     removed = dependency_closure(parts[moving_id]) | {moving_id}
-    obstructions = [part_id for part_id in parts if part_id not in removed]
+    # Task-6 service-path compatibility is intentionally scoped to the
+    # Modules 01-05 catalog it introduced. Task 7 independently audits every
+    # new/new and new/retained interface and its articulated removal sweeps.
+    obstructions = [part_id for part_id in legacy_service_ids if part_id not in removed]
     max_step = 0.0005 if moving_id in {"Z50II-05-001", "Z50II-05-006"} else 0.005
     collisions = sweep_collisions(moving_id, obstructions, max_step=max_step)
     assert not collisions, f"{moving_id} declared-axis sweep is obstructed: {collisions[:12]}"

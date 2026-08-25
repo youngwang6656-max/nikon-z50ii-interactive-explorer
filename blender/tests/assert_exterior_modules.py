@@ -58,6 +58,7 @@ REQUIRED_METADATA = {
 all_part_objects = [obj for obj in bpy.data.objects if obj.get("partId")]
 all_part_ids = [obj["partId"] for obj in all_part_objects]
 assert len(all_part_ids) == len(set(all_part_ids)), "duplicate global partId values found"
+all_parts = {obj["partId"]: obj for obj in all_part_objects}
 
 exterior_objects = [
     obj for obj in all_part_objects if obj.get("moduleId") in EXPECTED_BY_MODULE
@@ -87,24 +88,26 @@ for module_id, expected_ids in EXPECTED_BY_MODULE.items():
         axis = Vector(obj["explodeAxis"])
         assert abs(axis.length - 1.0) < 1e-6, f"{part_id} has non-unit explodeAxis"
         assert obj["explodeDistance"] > 0.0, f"{part_id} has no explode distance"
-        unresolved = set(obj["dependsOn"]) - EXPECTED
+        unresolved = set(obj["dependsOn"]) - set(all_parts)
         assert not unresolved, f"{part_id} has unresolved dependencies: {sorted(unresolved)}"
         out_of_order = {
             dependency
             for dependency in obj["dependsOn"]
-            if parts[dependency]["step"] >= obj["step"]
+            if all_parts[dependency]["step"] >= obj["step"]
         }
         assert not out_of_order, (
             f"{part_id} depends on parts not removed earlier: {sorted(out_of_order)}"
         )
 
-assert {parts[part_id]["step"] for part_id in EXPECTED_BY_MODULE["01_chassis_front"]} == set(
-    range(28, 36)
-), "module 01 must occupy disassembly steps 28-35"
+assert {parts[part_id]["step"] for part_id in EXPECTED_BY_MODULE["01_chassis_front"]} == {
+    38,
+    39,
+    40,
+}, "module 01 must close the final 40-step disassembly timeline"
 assert all(
-    1 <= parts[part_id]["step"] <= 20
+    1 <= parts[part_id]["step"] <= 17
     for part_id in EXPECTED_BY_MODULE["02_outer_shell_controls"]
-), "module 02 removal steps must be in the visible exterior range 1-20"
+), "module 02 removal steps must precede the internal service range"
 
 # Include every visible mesh in the two exterior collections, including grouped
 # child geometry without a selectable part ID. The scene is saved assembled, so

@@ -24,16 +24,21 @@ SILHOUETTE_VIEWS = {
     "three-quarter": (0.25, -0.30, 0.19),
 }
 
-CORE_INTERNAL_MODULE_COUNTS = {
+FINAL_MODULE_COUNTS = {
+    "01_chassis_front": 8,
+    "02_outer_shell_controls": 20,
     "03_mount_shutter_sensor": 12,
     "04_mainboard_thermal": 12,
     "05_power_storage": 8,
+    "06_evf_top_flash": 10,
+    "07_rear_lcd_controls": 12,
+    "08_io_flex_fasteners": 18,
 }
 
 
-def verify_core_internal_catalog() -> None:
-    """Fail a master build if an installed Task 6 builder is incomplete."""
-    for module_id, expected_count in CORE_INTERNAL_MODULE_COUNTS.items():
+def verify_final_catalog() -> None:
+    """Fail a master build unless every release module has its exact count."""
+    for module_id, expected_count in FINAL_MODULE_COUNTS.items():
         actual_count = sum(
             obj.get("moduleId") == module_id and bool(obj.get("partId"))
             for obj in bpy.data.objects
@@ -42,6 +47,15 @@ def verify_core_internal_catalog() -> None:
             f"{module_id} produced {actual_count} selectable parts; "
             f"expected {expected_count}"
         )
+    part_ids = [obj["partId"] for obj in bpy.data.objects if obj.get("partId")]
+    assert len(part_ids) == len(set(part_ids)) == 100, (
+        f"expected 100 unique selectable parts, got {len(part_ids)} objects and "
+        f"{len(set(part_ids))} IDs"
+    )
+
+
+# Compatibility name used by the Task-6 save/build assertions.
+verify_core_internal_catalog = verify_final_catalog
 
 
 def _point_at(obj: bpy.types.Object, target: tuple[float, float, float]) -> None:
@@ -104,6 +118,6 @@ if __name__ == "__main__":
     root = Path(__file__).resolve().parent.parent
     output_path = root / "artifacts" / "z50ii_master.blend"
     bpy.context.preferences.filepaths.save_version = 0
-    build_scene(output_path, validator=verify_core_internal_catalog)
+    build_scene(output_path, validator=verify_final_catalog)
     if os.environ.get("Z50II_RENDER_SILHOUETTES") == "1":
         render_silhouette_views(root / "artifacts" / "renders" / "silhouette")
