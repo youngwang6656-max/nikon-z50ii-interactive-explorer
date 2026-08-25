@@ -177,7 +177,7 @@ def build_mainboard_thermal() -> list[bpy.types.Object]:
 
     secondary_pcb = panel(
         "Z50II-04-010_secondary_control_pcb",
-        ((-7.0, -15.0), (6.0, -15.0), (8.0, -12.0), (8.0, 12.0), (5.0, 15.0), (-7.0, 15.0)),
+        ((-5.4, -15.0), (6.0, -15.0), (8.0, -12.0), (8.0, 12.0), (5.0, 15.0), (-5.4, 15.0)),
         0.9,
         (30.0, 22.7, 0),
         (0, 0, 0),
@@ -197,8 +197,8 @@ def build_mainboard_thermal() -> list[bpy.types.Object]:
     for index, (x, z) in enumerate(((-7.0, -17.0), (2.0, -18.5), (12.0, -17.0), (18.0, -10.0)), start=2):
         connector = rounded_box(f"Z50II_flex_connector_{index}", (8.0, 1.1, 2.5), (x, 24.0, z), 0.35, collection, connector_mat)
         _parent(connector, connector_bank)
-        _parent(rounded_box(f"Z50II_flex_connector_latch_{index}", (6.5, 0.45, 0.8), (x, 24.75, z), 0.18, collection, package_mat), connector_bank)
-    _parent(rounded_box("Z50II_flex_connector_latch_1", (6.5, 0.45, 0.8), (-16.0, 24.75, -17.0), 0.18, collection, package_mat), connector_bank)
+        _parent(rounded_box(f"Z50II_flex_connector_latch_{index}", (6.5, 0.45, 0.8), (x, 24.70, z), 0.18, collection, package_mat), connector_bank)
+    _parent(rounded_box("Z50II_flex_connector_latch_1", (6.5, 0.45, 0.8), (-16.0, 24.70, -17.0), 0.18, collection, package_mat), connector_bank)
     _annotate(connector_bank, "Z50II-04-012", "五个具有独立锁扣的排线连接器外壳，用于教学识别接口位置。", "Five flex-connector housings with separate latches for readable interface routing.")
 
     return [

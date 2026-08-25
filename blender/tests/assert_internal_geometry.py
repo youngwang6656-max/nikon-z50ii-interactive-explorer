@@ -11,9 +11,12 @@ from mathutils.bvhtree import BVHTree
 depsgraph = bpy.context.evaluated_depsgraph_get()
 parts = {obj["partId"]: obj for obj in bpy.data.objects if obj.get("partId")}
 
-# Deliberate assembly interfaces are checked numerically below. No triangle
-# interpenetration is permitted across selectable roots, even at those joints.
-ALLOWED_CROSS_ROOT_INTERSECTIONS = set()
+# The pins deliberately enter their insulated carrier; this is the sole
+# selectable-root mating penetration. Every other Task-6 root pair must have
+# zero evaluated triangle overlap, including pairs inside the same module.
+ALLOWED_TASK6_ROOT_INTERFACES = {
+    frozenset(("Z50II-03-003", "Z50II-03-004")): "contact pins enter insulated carrier",
+}
 CONTACT_GAP_TOLERANCES_MM = {
     "package_to_pcb": (0.02, 0.10),
     "lead_to_pcb": (0.00, 0.03),
@@ -55,6 +58,7 @@ def evaluated_geometry(obj, offset=Vector((0.0, 0.0, 0.0))):
 
 
 _bvh_cache = {}
+_bounds_cache = {}
 
 
 def object_bvh(obj, offset=Vector((0.0, 0.0, 0.0))):
@@ -71,6 +75,14 @@ def intersecting_submesh_pairs(first_root, second_root, first_offset=Vector((0.0
     collisions = []
     for first in root_meshes(first_root):
         for second in root_meshes(second_root):
+            first_min, first_max = evaluated_bounds(first)
+            second_min, second_max = evaluated_bounds(second)
+            if any(
+                first_max[axis] + first_offset[axis] < second_min[axis]
+                or first_min[axis] + first_offset[axis] > second_max[axis]
+                for axis in range(3)
+            ):
+                continue
             overlaps = object_bvh(first, first_offset).overlap(object_bvh(second))
             if overlaps:
                 collisions.append((first.name, second.name, len(overlaps)))
@@ -78,10 +90,12 @@ def intersecting_submesh_pairs(first_root, second_root, first_offset=Vector((0.0
 
 
 def evaluated_bounds(obj):
-    vertices, _polygons = evaluated_geometry(obj)
-    minimum = Vector(tuple(min(point[index] for point in vertices) for index in range(3)))
-    maximum = Vector(tuple(max(point[index] for point in vertices) for index in range(3)))
-    return minimum, maximum
+    if obj.name not in _bounds_cache:
+        vertices, _polygons = evaluated_geometry(obj)
+        minimum = Vector(tuple(min(point[index] for point in vertices) for index in range(3)))
+        maximum = Vector(tuple(max(point[index] for point in vertices) for index in range(3)))
+        _bounds_cache[obj.name] = (minimum, maximum)
+    return _bounds_cache[obj.name]
 
 
 def gap_y(front_obj, rear_obj):
@@ -100,11 +114,11 @@ def dependency_closure(part):
     return result
 
 
-def sweep_collisions(part_id, obstruction_ids):
+def sweep_collisions(part_id, obstruction_ids, max_step=0.005):
     moving = parts[part_id]
     axis = Vector(moving["explodeAxis"])
     distance = moving["explodeDistance"]
-    sample_count = max(2, ceil(distance / 0.005))
+    sample_count = max(2, ceil(distance / max_step))
     collisions = []
     for index in range(sample_count + 1):
         offset = axis * distance * index / sample_count
@@ -115,31 +129,36 @@ def sweep_collisions(part_id, obstruction_ids):
     return collisions
 
 
-# All cross-module assembled geometry must be free of triangle intersections.
+# Every Task-6 pair, including pairs in the same module, plus every retained
+# Task-4/5 root interface must be free of triangle intersections.
 internal_ids = sorted(
     part_id for part_id in parts if part_id.startswith(("Z50II-03", "Z50II-04", "Z50II-05"))
 )
 retained_ids = sorted(
     part_id for part_id in parts if part_id.startswith(("Z50II-01", "Z50II-02"))
 )
-cross_pairs = [
+retained_pairs = [
     (first, second)
     for first in internal_ids
     for second in retained_ids
-] + [
-    (first, second)
-    for first, second in combinations(internal_ids, 2)
-    if parts[first]["moduleId"] != parts[second]["moduleId"]
 ]
-cross_intersections = {}
-for first_id, second_id in cross_pairs:
+task6_pairs = list(combinations(internal_ids, 2))
+assert len(retained_pairs) == 896 and len(task6_pairs) == 496
+assert len(ALLOWED_TASK6_ROOT_INTERFACES) == 1
+checked_task6_pair_count = sum(
+    frozenset(pair) not in ALLOWED_TASK6_ROOT_INTERFACES for pair in task6_pairs
+)
+assert checked_task6_pair_count == 495
+assembled_pairs = retained_pairs + task6_pairs
+assembled_intersections = {}
+for first_id, second_id in assembled_pairs:
     pair = frozenset((first_id, second_id))
-    if pair in ALLOWED_CROSS_ROOT_INTERSECTIONS:
+    if pair in ALLOWED_TASK6_ROOT_INTERFACES:
         continue
     overlaps = intersecting_submesh_pairs(parts[first_id], parts[second_id])
     if overlaps:
-        cross_intersections[(first_id, second_id)] = overlaps
-assert not cross_intersections, f"cross-module root interpenetration: {cross_intersections}"
+        assembled_intersections[(first_id, second_id)] = overlaps
+assert not assembled_intersections, f"selectable-root interpenetration: {assembled_intersections}"
 
 # Tight internal fits are also nonintersecting and have explicit clearance.
 for first_id, second_id in (
@@ -153,7 +172,8 @@ for first_id, second_id in (
     assert not overlaps, f"{first_id}/{second_id} interpenetrate: {overlaps}"
 
 # Battery and card remain door-removable while their fixed carriers may require
-# the bottom shell. Sweep every <=5 mm along the declared removal axes.
+# the bottom shell. Battery/card sweeps use <=0.5 mm spacing so thin
+# obstructions cannot hide between samples; fixed service parts retain <=5 mm.
 for consumable_id in ("Z50II-05-001", "Z50II-05-006"):
     assert "Z50II-02-007" in dependency_closure(parts[consumable_id])
     assert "Z50II-02-004" not in dependency_closure(parts[consumable_id])
@@ -164,7 +184,8 @@ power_storage_ids = tuple(f"Z50II-05-{index:03d}" for index in range(1, 9))
 for moving_id in power_storage_ids:
     removed = dependency_closure(parts[moving_id]) | {moving_id}
     obstructions = [part_id for part_id in parts if part_id not in removed]
-    collisions = sweep_collisions(moving_id, obstructions)
+    max_step = 0.0005 if moving_id in {"Z50II-05-001", "Z50II-05-006"} else 0.005
+    collisions = sweep_collisions(moving_id, obstructions, max_step=max_step)
     assert not collisions, f"{moving_id} declared-axis sweep is obstructed: {collisions[:12]}"
 
 # The Task-5 object is a discontinuous recessed seat, while the selectable
@@ -201,12 +222,53 @@ def radial_root_hits(root, radius_mm, sample_count=16):
     return hits
 
 
-seat_hits = radial_ray_hits(seat, 29.0)
+# Handedness reflection swaps the source-X sign, so the four actual world-space
+# pad centers are 125°, 55°, 305°, and 235° in object-name order.
+seat_angles = (125, 55, 305, 235)
+seat_pads = (
+    seat,
+    bpy.data.objects["Z50II_mount_recessed_seat_2"],
+    bpy.data.objects["Z50II_mount_recessed_seat_3"],
+    bpy.data.objects["Z50II_mount_recessed_seat_4"],
+)
+seat_pad_hits = {
+    pad.name: radial_ray_hits(pad, 32.0, sample_count=72)
+    for pad in seat_pads
+}
+for pad, expected_angle in zip(seat_pads, seat_angles):
+    origin = Vector((32.0 * cos(radians(expected_angle)) / 1000.0, -0.006, 32.0 * sin(radians(expected_angle)) / 1000.0))
+    assert object_bvh(pad).ray_cast(origin, Vector((0.0, 1.0, 0.0)), 0.012)[0] is not None
+for gap_angle in (0, 90, 180, 270):
+    origin = Vector((32.0 * cos(radians(gap_angle)) / 1000.0, -0.006, 32.0 * sin(radians(gap_angle)) / 1000.0))
+    assert all(object_bvh(pad).ray_cast(origin, Vector((0.0, 1.0, 0.0)), 0.012)[0] is None for pad in seat_pads)
+assert all(0 < hit_count <= 4 for hit_count in seat_pad_hits.values()), seat_pad_hits
 ring_hits = radial_ray_hits(mount_ring, 28.8)
 residual_ring_hits = radial_root_hits(parts["Z50II-02-001"], 29.0)
-assert seat_hits <= 6, f"Task-5 seat remains a duplicate continuous ring: {seat_hits}/16 rays"
 assert ring_hits >= 14, f"selectable mount ring is not continuous: {ring_hits}/16 rays"
 assert residual_ring_hits == 0, f"residual Task-5 mount geometry crosses {residual_ring_hits}/16 rays"
+
+# The secondary board clears the main-board edge after bevel evaluation, and
+# connector latches sit in front of the rear-shield ribs without tangent faces.
+main_min, main_max = evaluated_bounds(parts["Z50II-04-001"])
+secondary_min, secondary_max = evaluated_bounds(parts["Z50II-04-010"])
+main_secondary_gap = (secondary_min.x - main_max.x) * 1000.0
+assert 0.05 <= main_secondary_gap <= 0.20, f"main/secondary PCB gap={main_secondary_gap:.3f} mm"
+
+rear_shield_meshes = root_meshes(parts["Z50II-04-007"])
+connector_latches = [bpy.data.objects[f"Z50II_flex_connector_latch_{index}"] for index in range(1, 6)]
+latch_shield_gaps = []
+for latch in connector_latches:
+    latch_min, latch_max = evaluated_bounds(latch)
+    for shield_mesh in rear_shield_meshes:
+        shield_min, shield_max = evaluated_bounds(shield_mesh)
+        overlaps_xz = (
+            min(latch_max.x, shield_max.x) > max(latch_min.x, shield_min.x)
+            and min(latch_max.z, shield_max.z) > max(latch_min.z, shield_min.z)
+        )
+        if overlaps_xz:
+            latch_shield_gaps.append((shield_min.y - latch_max.y) * 1000.0)
+latch_shield_gap = min(latch_shield_gaps)
+assert 0.02 <= latch_shield_gap <= 0.08, f"connector-latch/rear-shield gap={latch_shield_gap:.3f} mm"
 
 # PCB packages and their leads seat at the board face within explicit tolerances.
 pcb_front_y = evaluated_bounds(parts["Z50II-04-001"])[0].y
@@ -268,7 +330,11 @@ low, high = CONTACT_GAP_TOLERANCES_MM["card_to_cage"]
 assert all(low <= gap <= high for gap in card_clearances.values()), card_clearances
 
 print(
-    "Internal geometry passed: cross_intersections=0, sweeps=8 clear, "
+    "Internal geometry passed: selectable_intersections=0, "
+    f"task6_pairs_checked={checked_task6_pair_count}/496, retained_pairs={len(retained_pairs)}, "
+    "sweeps=8 clear, consumable_step_mm<=0.5, "
+    f"seat_pad_hits={seat_pad_hits}, main_secondary_gap_mm={main_secondary_gap:.3f}, "
+    f"latch_shield_gap_mm={latch_shield_gap:.3f}, "
     f"package_gaps_mm={package_gaps}, thermal_gaps_mm={thermal_gaps}, "
     f"terminal_gap_mm={terminal_gap:.3f}, card_clearances_mm={card_clearances}"
 )
