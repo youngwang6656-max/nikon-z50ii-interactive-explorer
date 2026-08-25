@@ -1,4 +1,4 @@
-"""Build the Z50II master scene and optionally render Task 5 silhouettes."""
+"""Build the Z50II master scene and optionally render inspection silhouettes."""
 
 from pathlib import Path
 import os
@@ -23,6 +23,25 @@ SILHOUETTE_VIEWS = {
     "top": (0.01, 0.02, 0.42),
     "three-quarter": (0.25, -0.30, 0.19),
 }
+
+CORE_INTERNAL_MODULE_COUNTS = {
+    "03_mount_shutter_sensor": 12,
+    "04_mainboard_thermal": 12,
+    "05_power_storage": 8,
+}
+
+
+def verify_core_internal_catalog() -> None:
+    """Fail a master build if an installed Task 6 builder is incomplete."""
+    for module_id, expected_count in CORE_INTERNAL_MODULE_COUNTS.items():
+        actual_count = sum(
+            obj.get("moduleId") == module_id and bool(obj.get("partId"))
+            for obj in bpy.data.objects
+        )
+        assert actual_count == expected_count, (
+            f"{module_id} produced {actual_count} selectable parts; "
+            f"expected {expected_count}"
+        )
 
 
 def _point_at(obj: bpy.types.Object, target: tuple[float, float, float]) -> None:
@@ -86,5 +105,6 @@ if __name__ == "__main__":
     output_path = root / "artifacts" / "z50ii_master.blend"
     bpy.context.preferences.filepaths.save_version = 0
     build_scene(output_path)
+    verify_core_internal_catalog()
     if os.environ.get("Z50II_RENDER_SILHOUETTES") == "1":
         render_silhouette_views(root / "artifacts" / "renders" / "silhouette")
