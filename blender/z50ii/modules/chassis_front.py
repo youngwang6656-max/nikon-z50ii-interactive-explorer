@@ -17,7 +17,7 @@ MODULE_ID = "01_chassis_front"
 PART_META = {
     "Z50II-01-001": ("", "镁合金主机架", "Magnesium chassis", 35, (0, 1, 0), 42, ("Z50II-01-003", "Z50II-01-005", "Z50II-01-007", "Z50II-01-008")),
     "Z50II-01-002": ("Z50II-01-001", "前部内框", "Front inner frame", 33, (0, -1, 0), 32, ("Z50II-01-004",)),
-    "Z50II-01-003": ("Z50II-01-001", "握柄内框", "Grip inner frame", 29, (1, 0, 0), 35, ("Z50II-02-002", "Z50II-02-006")),
+    "Z50II-01-003": ("Z50II-01-001", "握柄内框", "Grip inner frame", 29, (-1, 0, 0), 35, ("Z50II-02-002", "Z50II-02-006")),
     "Z50II-01-004": ("Z50II-01-002", "卡口支撑板", "Mount support plate", 32, (0, -1, 0), 30, ("Z50II-02-001",)),
     "Z50II-01-005": ("Z50II-01-001", "传感器导轨框", "Sensor rail frame", 34, (0, 1, 0), 34, ("Z50II-01-002",)),
     "Z50II-01-006": ("Z50II-01-001", "底部加强板", "Bottom reinforcement plate", 30, (0, 0, -1), 28, ("Z50II-02-004", "Z50II-02-007")),
@@ -60,6 +60,16 @@ def _annotate(obj, part_id, description_zh, description_en):
         depends_on=dependencies,
         is_reference_geometry=True,
     )
+
+
+def _mirror_selectable_hierarchies_x(collection: bpy.types.Collection) -> None:
+    for obj in [candidate for candidate in collection.objects if candidate.get("partId")]:
+        obj.location.x = -obj.location.x
+        obj.scale.x = -obj.scale.x
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
 
 def build_chassis_front() -> list[bpy.types.Object]:
@@ -144,6 +154,8 @@ def build_chassis_front() -> list[bpy.types.Object]:
     _rail("Z50II_strap_reinforcement_left_web", (13, 2, 2), (-47, 11, 15), 0.45, collection, dark, left_reinforcement, -30)
     _rail("Z50II_strap_reinforcement_right_web", (13, 2, 2), (56, 11, 15), 0.45, collection, dark, left_reinforcement, 30)
     _annotate(left_reinforcement, "Z50II-01-008", "左右肩带眼载荷位置的成对安装柱与斜撑参考件。", "Paired reference mounting posts and diagonal webs at the strap-eyelet load paths.")
+
+    _mirror_selectable_hierarchies_x(collection)
 
     return [chassis, front_frame, grip_frame, mount_plate, sensor_top, bottom_plate, tripod_socket, left_reinforcement]
 

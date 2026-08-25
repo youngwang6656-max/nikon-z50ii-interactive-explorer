@@ -20,22 +20,22 @@ PART_META = {
     "Z50II-02-002": ("Z50II-02-001", "握柄橡胶", "Grip rubber", 9, (0, -1, 0), 38, ("Z50II-02-001", "Z50II-02-006")),
     "Z50II-02-003": ("Z50II-02-001", "顶壳", "Top shell", 7, (0, 0, 1), 42, ("Z50II-02-005", "Z50II-02-006")),
     "Z50II-02-004": ("Z50II-02-001", "底壳", "Bottom shell", 4, (0, 0, -1), 35, ("Z50II-02-007",)),
-    "Z50II-02-005": ("Z50II-02-001", "左侧盖", "Left side cover", 5, (-1, 0, 0), 30, ("Z50II-02-004", "Z50II-02-008", "Z50II-02-009")),
-    "Z50II-02-006": ("Z50II-02-001", "右握柄盖", "Right grip cover", 6, (1, 0, 0), 34, ("Z50II-02-004",)),
+    "Z50II-02-005": ("Z50II-02-001", "左侧盖", "Left side cover", 5, (1, 0, 0), 30, ("Z50II-02-004", "Z50II-02-008", "Z50II-02-009")),
+    "Z50II-02-006": ("Z50II-02-001", "右握柄盖", "Right grip cover", 6, (-1, 0, 0), 34, ("Z50II-02-004",)),
     "Z50II-02-007": ("Z50II-02-004", "电池舱门", "Battery door", 1, (0, 0, -1), 24, ()),
-    "Z50II-02-008": ("Z50II-02-005", "上接口舱门", "Upper port door", 2, (-1, 0, 0), 22, ()),
-    "Z50II-02-009": ("Z50II-02-005", "下接口舱门", "Lower port door", 3, (-1, 0, 0), 22, ()),
+    "Z50II-02-008": ("Z50II-02-005", "上接口舱门", "Upper port door", 2, (1, 0, 0), 22, ()),
+    "Z50II-02-009": ("Z50II-02-005", "下接口舱门", "Lower port door", 3, (1, 0, 0), 22, ()),
     "Z50II-02-010": ("Z50II-02-002", "快门释放按钮", "Shutter-release button", 12, (0, 0, 1), 18, ("Z50II-02-002",)),
     "Z50II-02-011": ("Z50II-02-010", "电源环", "Power collar", 13, (0, 0, 1), 18, ("Z50II-02-010",)),
-    "Z50II-02-012": ("Z50II-02-002", "前指令拨轮", "Front command dial", 14, (1, 0, 0), 20, ("Z50II-02-002",)),
-    "Z50II-02-013": ("Z50II-02-003", "后指令拨轮", "Rear command dial", 15, (1, 0, 0), 20, ("Z50II-02-003",)),
+    "Z50II-02-012": ("Z50II-02-002", "前指令拨轮", "Front command dial", 14, (-1, 0, 0), 20, ("Z50II-02-002",)),
+    "Z50II-02-013": ("Z50II-02-003", "后指令拨轮", "Rear command dial", 15, (-1, 0, 0), 20, ("Z50II-02-003",)),
     "Z50II-02-014": ("Z50II-02-003", "模式拨盘", "Mode dial", 16, (0, 0, 1), 22, ("Z50II-02-003",)),
     "Z50II-02-015": ("Z50II-02-003", "照片／视频选择器", "Photo/video selector", 17, (0, 1, 0), 18, ("Z50II-02-003",)),
     "Z50II-02-016": ("Z50II-02-001", "Fn1按钮", "Fn1 button", 18, (0, -1, 0), 16, ("Z50II-02-001",)),
     "Z50II-02-017": ("Z50II-02-001", "Fn2按钮", "Fn2 button", 19, (0, -1, 0), 16, ("Z50II-02-016",)),
     "Z50II-02-018": ("Z50II-02-001", "镜头释放按钮", "Lens-release button", 20, (0, -1, 0), 16, ("Z50II-02-001",)),
-    "Z50II-02-019": ("Z50II-02-005", "左肩带环", "Left strap lug", 10, (-1, 0, 0), 24, ("Z50II-02-005",)),
-    "Z50II-02-020": ("Z50II-02-006", "右肩带环", "Right strap lug", 11, (1, 0, 0), 24, ("Z50II-02-006",)),
+    "Z50II-02-019": ("Z50II-02-005", "左肩带环", "Left strap lug", 10, (1, 0, 0), 24, ("Z50II-02-005",)),
+    "Z50II-02-020": ("Z50II-02-006", "右肩带环", "Right strap lug", 11, (-1, 0, 0), 24, ("Z50II-02-006",)),
 }
 
 
@@ -111,6 +111,8 @@ def _profile_shell_y(
         base = (len(profiles) - 1) * count
         faces.append(tuple(base + index for index in range(count)))
     obj = _mesh_object(name, vertices, faces, collection, material)
+    for polygon in obj.data.polygons:
+        polygon.use_smooth = True
     _solidify(obj, thickness_mm)
     _bevel(obj, bevel_mm)
     return obj
@@ -119,13 +121,18 @@ def _profile_shell_y(
 def _loft_grip_skin(name, collection, material) -> bpy.types.Object:
     levels = (
         (-38.0, 53.0, -14.0, 15.0, 13.0),
-        (-30.0, 54.0, -15.0, 16.0, 17.0),
-        (-5.0, 56.0, -14.0, 14.0, 18.0),
-        (18.0, 55.0, -11.0, 14.5, 13.0),
-        (28.0, 52.0, -5.0, 12.0, 7.0),
+        (-34.0, 53.4, -14.5, 15.5, 15.0),
+        (-28.0, 54.0, -15.0, 15.8, 17.0),
+        (-18.0, 55.0, -15.0, 15.0, 17.0),
+        (-7.0, 56.0, -14.5, 14.0, 17.5),
+        (4.0, 56.0, -13.5, 14.0, 17.0),
+        (14.0, 55.5, -12.0, 14.2, 14.5),
+        (22.0, 54.0, -9.5, 13.5, 11.0),
+        (27.0, 52.0, -6.0, 12.0, 7.5),
+        (30.0, 50.0, -3.0, 10.0, 5.0),
         (31.0, 49.5, -1.5, 9.0, 4.5),
     )
-    segments = 48
+    segments = 64
     vertices = []
     for z, center_x, center_y, radius_x, radius_y in levels:
         for index in range(segments):
@@ -150,6 +157,83 @@ def _loft_grip_skin(name, collection, material) -> bpy.types.Object:
     _solidify(obj, 1.8)
     _bevel(obj, 0.7, 2)
     return obj
+
+
+def _pill_prism_y(
+    name,
+    width_mm,
+    height_mm,
+    depth_mm,
+    location_mm,
+    collection,
+    material,
+    *,
+    segments=12,
+    bevel_mm=0.3,
+):
+    radius = width_mm / 2.0
+    straight = height_mm / 2.0 - radius
+    outline = []
+    for index in range(segments + 1):
+        angle = pi * index / segments
+        outline.append((radius * cos(angle), straight + radius * sin(angle)))
+    for index in range(segments + 1):
+        angle = pi + pi * index / segments
+        outline.append((radius * cos(angle), -straight + radius * sin(angle)))
+    half_depth = depth_mm / 2.0
+    count = len(outline)
+    vertices = [(x, -half_depth, z) for x, z in outline]
+    vertices += [(x, half_depth, z) for x, z in outline]
+    faces = [tuple(reversed(range(count))), tuple(count + index for index in range(count))]
+    faces += [
+        (index, (index + 1) % count, count + (index + 1) % count, count + index)
+        for index in range(count)
+    ]
+    obj = _mesh_object(name, vertices, faces, collection, material)
+    obj.location = tuple(mm(value) for value in location_mm)
+    if bevel_mm > 0:
+        _bevel(obj, bevel_mm, 3)
+    return obj
+
+
+def _pill_cut(target, name, width_mm, height_mm, depth_mm, location_mm, collection):
+    cutter = _pill_prism_y(
+        name,
+        width_mm,
+        height_mm,
+        depth_mm,
+        location_mm,
+        collection,
+        None,
+        bevel_mm=0.45,
+    )
+    _boolean_difference(target, cutter, f"{name}_difference")
+
+
+def _pill_seat(name, width_mm, height_mm, location_mm, collection, material, parent):
+    seat = _pill_prism_y(name, width_mm, height_mm, 0.55, location_mm, collection, material, bevel_mm=0.3)
+    _pill_cut(
+        seat,
+        f"{name}_inner",
+        width_mm - 1.1,
+        height_mm - 1.1,
+        2.0,
+        location_mm,
+        collection,
+    )
+    _post_cut_finish(seat, 0.22)
+    return _parent(seat, parent)
+
+
+def _mirror_selectable_hierarchies_x(collection: bpy.types.Collection) -> None:
+    """Mirror assembled part hierarchies into the project's front-view handedness."""
+    for obj in [candidate for candidate in collection.objects if candidate.get("partId")]:
+        obj.location.x = -obj.location.x
+        obj.scale.x = -obj.scale.x
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
 
 def _side_panel(name, x_center, thickness, outline_yz, collection, material, bevel_mm=0.6):
@@ -300,15 +384,26 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
     red = get_material("Z50II Red Accent", (0.45, 0.01, 0.014, 1), metallic=0.0, roughness=0.34)
 
     body_outline = (
-        (-55.0, -31.0), (-54.0, 20.0), (-50.0, 29.0), (-37.0, 34.0),
-        (-25.0, 34.0), (-21.0, 39.0), (14.0, 39.0), (18.0, 34.0),
-        (39.0, 33.0), (49.0, 27.0), (53.0, 16.0), (52.0, -22.0),
-        (46.0, -32.0), (34.0, -36.0), (-43.0, -36.0),
+        (-55.0, -29.0), (-55.0, 15.0), (-54.0, 22.0), (-51.0, 28.0),
+        (-46.0, 32.0), (-38.0, 34.0), (-28.0, 34.5), (-24.0, 37.0),
+        (-21.0, 39.0), (14.0, 39.0), (18.0, 36.0), (20.0, 34.0),
+        (35.0, 34.0), (42.0, 32.0), (48.0, 28.0), (52.0, 22.0),
+        (53.0, 14.0), (53.0, -18.0), (51.0, -25.0), (47.0, -31.0),
+        (40.0, -34.0), (32.0, -36.0), (-43.0, -36.0), (-50.0, -34.0),
     )
-    rear_outline = tuple((x * 0.985, z + (0.8 if z > 25 else 0.0)) for x, z in body_outline)
+    body_profile_2 = tuple((x * 0.998, z + (0.15 if z > 30 else 0.0)) for x, z in body_outline)
+    body_profile_3 = tuple((x * 0.995, z + (0.35 if z > 30 else 0.0)) for x, z in body_outline)
+    body_profile_4 = tuple((x * 0.990, z + (0.55 if z > 30 else 0.0)) for x, z in body_outline)
+    rear_outline = tuple((x * 0.985, z + (0.75 if z > 25 else 0.0)) for x, z in body_outline)
     front_shell = _profile_shell_y(
         "Z50II-02-001_front_shell",
-        ((0.0, body_outline), (32.0, rear_outline)),
+        (
+            (0.0, body_outline),
+            (7.0, body_profile_2),
+            (16.0, body_profile_3),
+            (25.0, body_profile_4),
+            (32.0, rear_outline),
+        ),
         collection,
         shell,
         thickness_mm=1.8,
@@ -317,8 +412,10 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         cap_back=False,
     )
     _round_cut(front_shell, "reserved_z_mount_opening_55mm", 27.5, 7.0, (0, 1.5, 0), (90, 0, 0))
-    for index, (x, z, radius) in enumerate(((32, 8, 3.2), (34, -2, 3.0), (25, 7, 3.6))):
-        _round_cut(front_shell, f"front_control_bore_{index + 1}", radius, 5.0, (x, 0.6, z), (90, 0, 0))
+    _pill_cut(front_shell, "fn1_pill_bore", 5.9, 9.9, 5.0, (32, 0.6, 8), collection)
+    _pill_cut(front_shell, "fn2_pill_bore", 5.7, 9.5, 5.0, (32, 0.6, -3.5), collection)
+    _round_cut(front_shell, "lens_release_bore", 3.6, 5.0, (25, 0.6, 7), (90, 0, 0))
+    _box_cut(front_shell, "rear_display_hinge_pocket", (7.0, 7.0, 25.0), (-53.0, 30.0, -4.0))
     _post_cut_finish(front_shell, 0.45)
 
     mount_lip = torus("Z50II_mount_interface_lip", 29.2, 1.1, (0, -0.7, 0), (90, 0, 0), collection, metal)
@@ -332,26 +429,68 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         ("right", (3.0, 1.8, 57), (41, 32.3, -1)),
     ):
         _parent(rounded_box(f"Z50II_rear_interface_flange_{suffix}", size, location, 0.6, collection, edge), front_shell)
-    _parent(rounded_box("Z50II_display_hinge_land", (6, 3, 24), (-44, 31.5, -4), 1.0, collection, edge), front_shell)
+    display_pocket = rounded_box(
+        "Z50II_display_hinge_pocket_reveal",
+        (1.4, 5.0, 22.0),
+        (-51.8, 29.4, -4.0),
+        0.35,
+        collection,
+        glass,
+    )
+    _parent(display_pocket, front_shell)
+    _parent(rounded_box("Z50II_display_hinge_upper_land", (7, 4, 3), (-50, 29.5, 10), 0.7, collection, edge), front_shell)
+    _parent(rounded_box("Z50II_display_hinge_lower_land", (7, 4, 3), (-50, 29.5, -18), 0.7, collection, edge), front_shell)
     for index, angle in enumerate((35, 145, 215, 325)):
         x = 33.0 * cos(radians(angle))
         z = 33.0 * sin(radians(angle))
         boss = cylinder(f"Z50II_front_mount_boss_{index + 1}", 2.8, 3.2, (x, 3.0, z), (90, 0, 0), collection, edge, vertices=32)
         _parent(boss, front_shell)
-    for x, z, radius in ((32, 8, 3.8), (34, -2, 3.6), (25, 7, 4.1)):
-        _parent(torus(f"Z50II_control_seat_{x}_{z}", radius, 0.45, (x, -0.55, z), (90, 0, 0), collection, edge), front_shell)
+    _pill_seat("Z50II_fn1_pill_seat", 6.7, 10.7, (32, -0.55, 8), collection, edge, front_shell)
+    _pill_seat("Z50II_fn2_pill_seat", 6.5, 10.3, (32, -0.55, -3.5), collection, edge, front_shell)
+    _parent(torus("Z50II_lens_release_seat", 4.1, 0.45, (25, -0.55, 7), (90, 0, 0), collection, edge), front_shell)
     _decal_anchor("Z50II_brand_decal_anchor", "brand", (-18, -0.8, 27), 8.0, collection, front_shell)
     _decal_anchor("Z50II_model_decal_anchor", "model", (-41, -0.8, -27), 4.0, collection, front_shell)
     _annotate(front_shell, "Z50II-02-001", "带开放后部、内翻边和55毫米卡口开口的薄壁外壳参考重建。", "Thin open-back reference shell with inner flanges and a 55 mm mount opening.")
 
     grip_rubber = _loft_grip_skin("Z50II-02-002_grip_rubber", collection, rubber)
+    _round_cut(grip_rubber, "shutter_power_seat_cut", 6.6, 4.5, (49, -3, 30.8), (0, 0, 0))
+    _post_cut_finish(grip_rubber, 0.4)
+    shutter_seat = torus(
+        "Z50II_shutter_power_receiving_seat",
+        5.1,
+        0.8,
+        (49, -3, 30.4),
+        (0, 0, 0),
+        collection,
+        edge,
+    )
+    _parent(shutter_seat, grip_rubber)
+    _parent(
+        cylinder(
+            "Z50II_shutter_power_seat_floor",
+            4.3,
+            0.7,
+            (49, -3, 29.9),
+            (0, 0, 0),
+            collection,
+            control,
+            vertices=64,
+        ),
+        grip_rubber,
+    )
     _annotate(grip_rubber, "Z50II-02-002", "带收腰和掌托过渡的1.8毫米中空握柄蒙皮参考件。", "Hollow 1.8 mm grip skin with undercut and palm-support transitions.")
 
     deck_front = ((-50, 30), (-39, 36), (-27, 38), (28, 38), (45, 35), (52, 30))
     deck_rear = ((-49, 30), (-38, 35), (-26, 37), (28, 37), (44, 34), (50, 30))
     top_shell = _profile_shell_y(
         "Z50II-02-003_top_shell",
-        ((2.0, deck_front), (17.0, deck_front), (34.5, deck_rear)),
+        (
+            (2.0, deck_front),
+            (9.0, deck_front),
+            (17.0, deck_front),
+            (24.0, tuple((x * 0.995, z - 0.25) for x, z in deck_front)),
+            (31.0, deck_rear),
+        ),
         collection,
         shell,
         thickness_mm=1.8,
@@ -359,12 +498,35 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         cap_front=True,
         cap_back=True,
     )
-    evf_front = ((-22, 37), (-16, 51), (-11, 54), (4, 54), (10, 51), (15, 37))
-    evf_mid = ((-21, 37), (-15, 54), (-10, 56.92), (3, 56.92), (9, 53), (14, 37))
-    evf_rear = ((-19, 37), (-14, 50), (-9, 52), (2, 52), (8, 49), (12, 37))
+    evf_front = (
+        (-22, 37), (-21, 42), (-18, 49), (-14, 53), (-9, 54.5),
+        (3, 54.5), (8, 52.5), (12, 48), (15, 41), (15, 37),
+    )
+    evf_front_mid = (
+        (-21.8, 37), (-20.8, 43), (-17.3, 50.5), (-13, 54.5), (-8.5, 55.7),
+        (2.8, 55.7), (7.7, 54), (11.7, 49), (14.7, 42), (14.7, 37),
+    )
+    evf_mid = (
+        (-21.5, 37), (-20, 44), (-16, 52), (-11, 56), (-7, 56.92),
+        (2, 56.92), (7, 55), (11, 50), (14, 42), (14, 37),
+    )
+    evf_rear_mid = (
+        (-20.5, 37), (-19, 43), (-15.5, 50.5), (-11, 54), (-7, 55),
+        (2, 55), (6.8, 53.2), (10.5, 48.5), (13.2, 41.5), (13.2, 37),
+    )
+    evf_rear = (
+        (-19, 37), (-18, 42), (-14, 48.5), (-10, 51.5), (-6, 52.2),
+        (2, 52.2), (6.5, 50.5), (9.5, 47), (12, 41), (12, 37),
+    )
     evf = _profile_shell_y(
         "Z50II_evf_housing",
-        ((9.0, evf_front), (21.0, evf_mid), (34.0, evf_rear)),
+        (
+            (9.0, evf_front),
+            (14.0, evf_front_mid),
+            (21.0, evf_mid),
+            (28.0, evf_rear_mid),
+            (34.0, evf_rear),
+        ),
         collection,
         shell,
         thickness_mm=1.7,
@@ -387,7 +549,26 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
         collection,
         edge,
     )
+    _box_cut(bottom_shell, "battery_bay_opening", (33.0, 26.0, 5.0), (35.0, 17.0, -39.0))
+    _box_cut(bottom_shell, "battery_bay_hinge_clearance", (4.0, 21.0, 5.0), (20.5, 17.0, -39.0))
+    _box_cut(bottom_shell, "battery_bay_latch_clearance", (4.0, 5.0, 5.0), (49.5, 27.5, -39.0))
+    _post_cut_finish(bottom_shell, 0.35)
     _parent(rounded_box("Z50II_bottom_front_transition", (92, 5, 3.0), (-2, 3, -37.1), 1.2, collection, shell), bottom_shell)
+    battery_reveal = rounded_box(
+        "Z50II_battery_bay_reveal",
+        (33.0, 1.2, 1.0),
+        (35.0, 4.3, -38.4),
+        0.3,
+        collection,
+        edge,
+    )
+    _parent(battery_reveal, bottom_shell)
+    for suffix, size, location in (
+        ("rear", (33.0, 1.2, 1.0), (35.0, 29.7, -38.4)),
+        ("hinge", (1.2, 24.0, 1.0), (18.8, 17.0, -38.4)),
+        ("latch", (1.2, 22.0, 1.0), (51.2, 16.0, -38.4)),
+    ):
+        _parent(rounded_box(f"Z50II_battery_bay_reveal_{suffix}", size, location, 0.3, collection, edge), bottom_shell)
     _annotate(bottom_shell, "Z50II-02-004", "带收窄前后过渡和电池舱安装面的2毫米底部蒙皮。", "Two-millimetre base skin with tapered transitions and battery-door land.")
 
     left_outline = ((3, -27), (29, -26), (32, -18), (32, 20), (27, 29), (7, 30), (2, 22))
@@ -463,9 +644,29 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
     _parent(selector_lever, selector)
     _annotate(selector, "Z50II-02-015", "嵌入机背凹座并带径向拨杆的照片／视频选择器。", "Rear recessed photo/video selector with a radial lever.")
 
-    fn1 = cylinder("Z50II-02-016_fn1_button", 2.8, 1.8, (32, -0.8, 8), (90, 0, 0), collection, control, vertices=48)
+    fn1 = _pill_prism_y(
+        "Z50II-02-016_fn1_button",
+        4.8,
+        8.8,
+        1.7,
+        (32, -0.85, 8),
+        collection,
+        control,
+        segments=16,
+        bevel_mm=0.35,
+    )
     _annotate(fn1, "Z50II-02-016", "位于独立前壳沉孔中的Fn1功能按钮。", "Fn1 function button seated in a dedicated front-shell bore.")
-    fn2 = cylinder("Z50II-02-017_fn2_button", 2.6, 1.8, (34, -0.8, -2), (90, 0, 0), collection, control, vertices=48)
+    fn2 = _pill_prism_y(
+        "Z50II-02-017_fn2_button",
+        4.6,
+        8.4,
+        1.7,
+        (32, -0.85, -3.5),
+        collection,
+        control,
+        segments=16,
+        bevel_mm=0.35,
+    )
     _annotate(fn2, "Z50II-02-017", "位于独立前壳沉孔中的Fn2功能按钮。", "Fn2 function button seated in a dedicated front-shell bore.")
     lens_release = cylinder("Z50II-02-018_lens_release_button", 3.3, 1.9, (25, -0.8, 7), (90, 0, 0), collection, control, vertices=48)
     _annotate(lens_release, "Z50II-02-018", "预留Z卡口旁沉孔中的镜头释放按钮；本期不含镜头。", "Lens-release button in a mount-side bore; no lens is included.")
@@ -474,6 +675,8 @@ def build_outer_shell_controls() -> list[bpy.types.Object]:
     _annotate(left_lug, "Z50II-02-019", "具有贯通眼孔的左侧金属肩带环参考件。", "Reference left metal strap eyelet with a true open hole.")
     right_lug = torus("Z50II-02-020_right_strap_lug", 4.0, 1.2, (68.8, 11, 20), (0, 90, 0), collection, metal)
     _annotate(right_lug, "Z50II-02-020", "具有贯通眼孔的右侧金属肩带环参考件。", "Reference right metal strap eyelet with a true open hole.")
+
+    _mirror_selectable_hierarchies_x(collection)
 
     return [
         front_shell, grip_rubber, top_shell, bottom_shell, left_cover, right_cover,
