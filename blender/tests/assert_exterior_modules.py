@@ -55,12 +55,19 @@ REQUIRED_METADATA = {
 }
 
 
-parts = {obj.get("partId"): obj for obj in bpy.data.objects if obj.get("partId")}
+all_part_objects = [obj for obj in bpy.data.objects if obj.get("partId")]
+all_part_ids = [obj["partId"] for obj in all_part_objects]
+assert len(all_part_ids) == len(set(all_part_ids)), "duplicate global partId values found"
+
+exterior_objects = [
+    obj for obj in all_part_objects if obj.get("moduleId") in EXPECTED_BY_MODULE
+]
+parts = {obj["partId"]: obj for obj in exterior_objects}
 actual = set(parts)
 missing = EXPECTED - actual
 unexpected = actual - EXPECTED
 assert not missing, f"missing exterior part IDs: {sorted(missing)}"
-assert not unexpected, f"unexpected part IDs before Task 6: {sorted(unexpected)}"
+assert not unexpected, f"unexpected exterior part IDs: {sorted(unexpected)}"
 
 for module_id, expected_ids in EXPECTED_BY_MODULE.items():
     for part_id in expected_ids:
