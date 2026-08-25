@@ -25,6 +25,51 @@ const clampProgress = (value: number): number => {
 const partById = (manifest: AssemblyManifest, partId: string): PartManifest | undefined =>
   manifest.parts.find((part) => part.partId === partId);
 
+const compareParts = (left: PartManifest, right: PartManifest): number =>
+  left.step - right.step || (left.partId < right.partId ? -1 : left.partId > right.partId ? 1 : 0);
+
+const dependencyOrder = (manifest: AssemblyManifest): PartManifest[] => {
+  const partsById = new Map(manifest.parts.map((part) => [part.partId, part]));
+  const dependents = new Map<string, string[]>();
+  const remainingDependencies = new Map<string, number>();
+
+  manifest.parts.forEach((part) => {
+    const dependencies = part.dependsOn.filter((dependencyId) => partsById.has(dependencyId));
+    remainingDependencies.set(part.partId, dependencies.length);
+    dependencies.forEach((dependencyId) => {
+      const dependentIds = dependents.get(dependencyId) ?? [];
+      dependentIds.push(part.partId);
+      dependents.set(dependencyId, dependentIds);
+    });
+  });
+
+  const ready = manifest.parts
+    .filter((part) => remainingDependencies.get(part.partId) === 0)
+    .sort(compareParts);
+  const ordered: PartManifest[] = [];
+
+  while (ready.length > 0) {
+    const part = ready.shift()!;
+    ordered.push(part);
+    dependents.get(part.partId)?.forEach((dependentId) => {
+      const remaining = (remainingDependencies.get(dependentId) ?? 0) - 1;
+      remainingDependencies.set(dependentId, remaining);
+      if (remaining === 0) {
+        ready.push(partsById.get(dependentId)!);
+        ready.sort(compareParts);
+      }
+    });
+  }
+
+  // Parsed manifests are guaranteed acyclic. Keep a deterministic fallback
+  // for callers that construct an AssemblyManifest directly.
+  if (ordered.length < manifest.parts.length) {
+    const orderedIds = new Set(ordered.map((part) => part.partId));
+    ordered.push(...manifest.parts.filter((part) => !orderedIds.has(part.partId)).sort(compareParts));
+  }
+  return ordered;
+};
+
 export function createAssemblyState(manifest: AssemblyManifest): AssemblyState {
   const progress: Record<string, number> = {};
   manifest.parts.forEach((part) => {
@@ -68,19 +113,16 @@ export function setPartProgress(state: AssemblyState, partId: string, requestedP
 
 export function setGlobalExplode(state: AssemblyState, requestedProgress: number): AssemblyState {
   const target = clampProgress(requestedProgress);
-  const currentValues = state.manifest.parts.map((part) => state.progress[part.partId] ?? 0);
-  const average = currentValues.length === 0
-    ? 0
-    : currentValues.reduce((sum, value) => sum + value, 0) / currentValues.length;
-  const opening = target > average;
-  const orderedParts = [...state.manifest.parts].sort((left, right) => {
-    const stepOrder = opening ? left.step - right.step : right.step - left.step;
-    return stepOrder;
-  });
+  const orderedParts = dependencyOrder(state.manifest);
+  const partsToDecrease = orderedParts
+    .filter((part) => (state.progress[part.partId] ?? 0) > target)
+    .reverse();
+  const partsToIncrease = orderedParts.filter((part) => (state.progress[part.partId] ?? 0) < target);
 
   // Guided global movement deliberately applies the same target to every
-  // part, while the order of records follows dependency-safe assembly steps.
-  return orderedParts.reduce(
+  // part. Decreases close dependents first; increases open prerequisites
+  // first. This remains deterministic even when current progress is mixed.
+  return [...partsToDecrease, ...partsToIncrease].reduce(
     (nextState, part) => withProgress(nextState, part.partId, target),
     state,
   );

@@ -71,4 +71,31 @@ describe('assembly state', () => {
       manifest.parts[0]!.partId,
     ]);
   });
+
+  it('uses dependency order when manifest steps disagree with prerequisites', () => {
+    const graphWithDifferentSteps = structuredClone(fixture);
+    graphWithDifferentSteps.parts[0]!.step = 2;
+    graphWithDifferentSteps.parts[1]!.step = 1;
+    graphWithDifferentSteps.steps[0]!.partIds = [graphWithDifferentSteps.parts[1]!.partId];
+    graphWithDifferentSteps.steps[1]!.partIds = [graphWithDifferentSteps.parts[0]!.partId];
+    const differentManifest = parseManifest(graphWithDifferentSteps);
+
+    const exploded = setGlobalExplode(createAssemblyState(differentManifest), 1);
+    expect(exploded.history.map(({ partId }) => partId)).toEqual([
+      differentManifest.parts[0]!.partId,
+      differentManifest.parts[1]!.partId,
+    ]);
+  });
+
+  it('decreases parts above target before increasing parts below target', () => {
+    const fullyExploded = setGlobalExplode(createAssemblyState(manifest), 1);
+    const mixed = undoLastMove(fullyExploded);
+    const adjusted = setGlobalExplode(mixed, 0.5);
+
+    expect(adjusted.history.slice(-2).map(({ partId }) => partId)).toEqual([
+      manifest.parts[0]!.partId,
+      manifest.parts[1]!.partId,
+    ]);
+    expect(Object.values(adjusted.progress).every((value) => value === 0.5)).toBe(true);
+  });
 });
