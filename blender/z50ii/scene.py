@@ -89,6 +89,11 @@ def build_scene(
     """Build, optionally validate, then save without touching output on failure."""
     initialize_scene()
     call_module_builders()
+    from .materials import apply_material_system
+    from .studio_lighting import setup_studio
+
+    apply_material_system()
+    setup_studio()
     if validator is not None:
         validator()
     destination = Path(output_path)
