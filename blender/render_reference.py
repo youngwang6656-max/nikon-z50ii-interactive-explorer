@@ -95,18 +95,12 @@ def snapshot_decal_transforms() -> dict[str, Matrix]:
 
 def apply_explode(scale: float = 0.82) -> None:
     roots = selectable_roots()
-    roots_by_part_id = {obj["partId"]: obj for obj in roots}
     for obj in roots:
         axis = Vector(obj["explodeAxis"])
         distance = float(obj["explodeDistance"])
         matrix = obj.matrix_world.copy()
         matrix.translation += axis * distance * scale
         obj.matrix_world = matrix
-    for decal in (obj for obj in bpy.data.objects if obj.get("attachedPartId")):
-        attached = roots_by_part_id[decal["attachedPartId"]]
-        matrix = decal.matrix_world.copy()
-        matrix.translation += Vector(attached["explodeAxis"]) * float(attached["explodeDistance"]) * scale
-        decal.matrix_world = matrix
 
 
 def restore_transforms(snapshot: dict[str, Matrix]) -> None:

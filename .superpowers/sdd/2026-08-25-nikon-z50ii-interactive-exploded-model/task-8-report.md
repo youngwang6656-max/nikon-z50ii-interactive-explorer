@@ -203,3 +203,98 @@ WebP files also exist and decode through Blender during the build.
   verified rather than rerendered during recovery, avoiding an unnecessary
   multi-hour Cycles rerender. The environment and master were regenerated and
   the PNG contents were checked bytewise, visually, and quantitatively.
+
+## Fix round 1/5 — review findings resolved
+
+This round supersedes the first two implementation limitations and the stale
+render-provenance limitation above. All ten decals are now ray-projected onto
+evaluated host geometry, offset by a measured 0.05 mm along the hit normal,
+and transform-parented to their selectable host part. The Nikon wordmark was
+moved from the open mount/EVF-facing plane to a projected top-crown patch.
+`render_reference.py` no longer applies a second hard-coded decal translation
+during explosion; host parenting alone carries each graphic.
+
+The atlas now contains actual M/A/S/P dial markings, USB and HDMI symbols, a
+microphone symbol with a literal C glyph, and a sensor warning triangle. The
+sensor material retains exactly one Principled BSDF and uses Blender 4.5's
+420 nm thin-film input (`IOR=1.34`) for a restrained cyan/magenta angular
+response. The five micro-surface maps are now actual Cycles outputs produced by
+`bpy.ops.object.bake`, with per-file bake pass and SHA-256 provenance in
+`artifacts/textures/bake-manifest.json`.
+
+The HDR is no longer an independent analytic raster. It was freshly rendered
+from `artifacts/z50ii_master.blend` through the named
+`Studio_Environment_Panorama` equirectangular camera, using the actual
+`Studio_Key_FrontLeft`, `Studio_Fill_FrontRight`, and `Studio_Rim_Rear` area
+lights plus `Studio_Cyclorama`. The 128-sample Cycles render manifest and exact
+rig values are stored in `public/assets/environment/studio-neutral-1k.json`.
+
+### Focused RED evidence
+
+The strengthened Task 8 assertion was run against the pre-fix master and failed
+on the missing thin-film response:
+
+```text
+AssertionError: sensor glass lacks view-dependent thin-film color
+```
+
+After rebuilding with the partial material/decal fix, it failed on the missing
+real-bake provenance:
+
+```text
+AssertionError: surface maps lack Blender bake provenance
+```
+
+After adding the bake pipeline but before replacing the analytic environment,
+it failed on the missing studio-render provenance:
+
+```text
+AssertionError: HDR lacks render provenance from the studio rig
+```
+
+### Fresh GREEN evidence
+
+The master, environment, and both final references were regenerated with the
+required commands. The reference renderer reported exactly 1600 x 1200,
+128 Cycles samples, denoising, and `-4.5 EV`; render times were 154.47 s
+(assembled) and 155.81 s (exploded). Transform restoration remained within
+`1.192e-07` matrix delta.
+
+The final Task 8 assertion passed and reported:
+
+```text
+Decal host-distance QA: min=0.05000 mm, max=0.05001 mm, labels=10
+assembled-studio.png QA: p01=0.0115, p999=0.9155,
+  clip>=0.98=0.019531%, spread95-05=0.6684
+exploded-studio.png QA: p01=0.0413, p999=0.8849,
+  clip>=0.98=0.013646%, spread95-05=0.6026
+Task 8 materials/lighting assertion passed
+```
+
+The assertion additionally measures every decal vertex against its real host
+mesh, checks screen-space readability and facing in the exact assembled camera,
+checks host-relative transforms during a synthetic explode, validates graphic
+cell silhouettes in the atlas, verifies non-flat baked pixels and bake hashes,
+and validates the named-rig HDR manifest/hash.
+
+Both final 1600 x 1200 PNGs were inspected at original resolution. Material
+separation, contact shadows, framing, attached decals, crown Nikon placement,
+dial markings, and right-side port symbols were accepted. The render directory
+contains only the two required final PNGs; there are no diagnostic images.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `artifacts/renders/assembled-studio.png` | 1,930,950 | `699EF944E7FDE37FC8525EB10854E4F53DE173570F0B431D0F5F4974295E8632` |
+| `artifacts/renders/exploded-studio.png` | 1,890,863 | `1BCCA3BEEB358128B893CDC32BBA2BE283F07FE5D7BE014B93939AE99BB01CA9` |
+| `public/assets/environment/studio-neutral-1k.hdr` | 767,981 | `FA66FED36CD856DA1BAC9EED0C80D25B4030C997EB2F8624BDFABF683E7ED4EC` |
+
+All twelve Tasks 4–7 regressions were rerun sequentially against the fresh
+master and passed: builder kernel, exterior modules, future compatibility,
+exterior detail contract, internal modules, internal geometry, internal rebuild
+idempotence, build save guard, control modules/LCD sweep, hinge geometry,
+removal motion, and final scene validation. Key retained results include zero
+selectable intersections, 100 unique roots, 10,468 free-motion samples, 2,252
+guided samples, and a maximum 0.25 mm removal-motion sampling interval.
+
+No review concern remains for Task 8. `artifacts/z50ii_master.blend` remains an
+intentional untracked build product for the later packaging task.

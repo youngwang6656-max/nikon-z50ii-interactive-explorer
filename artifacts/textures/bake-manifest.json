@@ -1,0 +1,52 @@
+{
+  "blenderVersion": "4.5.12",
+  "engine": "CYCLES",
+  "maps": {
+    "body-black-normal-2k.png": {
+      "passType": "NORMAL",
+      "sha256": "19a08ccdea79e57663ea6282d9e2bb81110cd1c7270dd52df4315b61a419731d",
+      "sourceNodes": [
+        "ShaderNodeTexCoord",
+        "ShaderNodeMapping",
+        "ShaderNodeTexNoise"
+      ]
+    },
+    "body-black-roughness-2k.png": {
+      "passType": "EMIT",
+      "sha256": "2a7eec9cb814112dda4dd1c13b31941e49e3cd3b94d3c00fdcc587d9ecc8216b",
+      "sourceNodes": [
+        "ShaderNodeTexCoord",
+        "ShaderNodeMapping",
+        "ShaderNodeTexNoise"
+      ]
+    },
+    "grip-rubber-normal-2k.png": {
+      "passType": "NORMAL",
+      "sha256": "0e6986045b172e8945cb256dc4f69aa06b3849e4fc8ecb769b49eb557016b418",
+      "sourceNodes": [
+        "ShaderNodeTexCoord",
+        "ShaderNodeMapping",
+        "ShaderNodeTexNoise"
+      ]
+    },
+    "grip-rubber-roughness-2k.png": {
+      "passType": "EMIT",
+      "sha256": "33fcda856171824c3031e27a52ac643f6fd5dc77fb80935116ed4582dc05e931",
+      "sourceNodes": [
+        "ShaderNodeTexCoord",
+        "ShaderNodeMapping",
+        "ShaderNodeTexNoise"
+      ]
+    },
+    "internal-metal-roughness-1k.png": {
+      "passType": "EMIT",
+      "sha256": "ae47060b995654aa87fafe763f92dbc141570bbedae2df8e4cf8d898f0af0633",
+      "sourceNodes": [
+        "ShaderNodeTexCoord",
+        "ShaderNodeMapping",
+        "ShaderNodeTexNoise"
+      ]
+    }
+  },
+  "operator": "bpy.ops.object.bake"
+}

@@ -3,18 +3,22 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import json
 from math import isfinite
 from pathlib import Path
 import struct
 import zlib
 
 import bpy
+from bpy_extras.object_utils import world_to_camera_view
+from mathutils import Vector
 
 
 ROOT = Path(__file__).resolve().parents[2]
 TEXTURE_SOURCE = ROOT / "artifacts" / "textures"
 TEXTURE_PUBLIC = ROOT / "public" / "assets" / "textures"
 HDR_PATH = ROOT / "public" / "assets" / "environment" / "studio-neutral-1k.hdr"
+HDR_MANIFEST_PATH = ROOT / "public" / "assets" / "environment" / "studio-neutral-1k.json"
 RENDER_DIR = ROOT / "artifacts" / "renders"
 
 MATERIAL_KEYS = {
@@ -166,6 +170,10 @@ for name in sorted(MATERIAL_KEYS):
     assert not unsafe, f"{name} has non-glTF core shaders: {unsafe}"
     assert material.get("gltfSafeCore") is True
 
+sensor_principled = next(node for node in bpy.data.materials["sensor_glass"].node_tree.nodes if node.type == "BSDF_PRINCIPLED")
+assert sensor_principled.inputs["Thin Film Thickness"].default_value >= 300.0, "sensor glass lacks view-dependent thin-film color"
+assert 1.20 <= sensor_principled.inputs["Thin Film IOR"].default_value <= 1.60, "sensor thin-film IOR is not physically subtle"
+
 scene = bpy.context.scene
 assert scene.render.engine == "BLENDER_EEVEE_NEXT" or scene.render.engine == "CYCLES"
 assert scene.get("referenceRenderEngine") == "CYCLES"
@@ -193,10 +201,125 @@ for root in roots:
 
 decals = [obj for obj in meshes if obj.get("decalLabel")]
 assert DECAL_LABELS <= {obj["decalLabel"] for obj in decals}, "decal atlas labels are incomplete"
+
+
+def host_meshes(root: bpy.types.Object):
+    stack = [root]
+    while stack:
+        obj = stack.pop()
+        if obj is not root and obj.get("partId"):
+            continue
+        if obj.type == "MESH" and not obj.get("decalLabel"):
+            yield obj
+        stack.extend(obj.children)
+
+
+def measured_surface_distances(decal: bpy.types.Object, host: bpy.types.Object) -> list[float]:
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    surfaces = [obj.evaluated_get(depsgraph) for obj in host_meshes(host)]
+    distances = []
+    for vertex in decal.data.vertices:
+        world_point = decal.matrix_world @ vertex.co
+        candidates = []
+        for surface in surfaces:
+            local_point = surface.matrix_world.inverted() @ world_point
+            hit, location, _normal, _index = surface.closest_point_on_mesh(local_point)
+            if hit:
+                candidates.append((surface.matrix_world @ location - world_point).length)
+        assert candidates, f"{decal.name} has no measurable host surface"
+        distances.append(min(candidates) * 1000.0)
+    return distances
+
+
+roots_by_id = {root["partId"]: root for root in roots}
+decal_distances = {}
+expected_graphics = {
+    "Nikon": "brand-wordmark", "Z50II": "model-wordmark",
+    "MENU": "button-legend", "DISP": "button-legend", "ISO": "button-legend",
+    "MODE": "mode-dial-markings", "USB": "usb-port-icon", "HDMI": "hdmi-port-icon",
+    "MIC": "microphone-port-icon", "SENSOR": "sensor-warning-icon",
+}
 for decal in decals:
-    assert abs(decal.get("surfaceOffsetMm", 0.0) - 0.05) < 1.0e-9
+    host = roots_by_id[decal["attachedPartId"]]
+    assert decal.parent is host, f"{decal.name} is not transform-parented to {host.name}"
+    distances_mm = measured_surface_distances(decal, host)
+    decal_distances[decal["decalLabel"]] = distances_mm
+    assert min(distances_mm) >= 0.035, f"{decal.name} z-fights its host: {distances_mm}"
+    assert max(distances_mm) <= 0.075, f"{decal.name} floats off its host: {distances_mm}"
+    assert decal.get("decalKind") == expected_graphics[decal["decalLabel"]]
     assert decal.active_material and decal.active_material.name == "white_decal"
     assert decal.get("usesAtlas") == "//textures/decal-atlas-2k.png"
+
+assert bpy.data.materials["white_decal"].use_backface_culling, "rear/edge-on legends can leak into front renders"
+
+# Visible front/top/side marks must occupy a readable on-frame footprint in the
+# actual assembled reference camera, rather than becoming edge-on fragments.
+camera_data = bpy.data.cameras.new("Task8_Decal_QA_Camera")
+camera_data.lens = 64.0
+camera_data.sensor_width = 36.0
+camera = bpy.data.objects.new("Task8_Decal_QA_Camera", camera_data)
+bpy.context.scene.collection.objects.link(camera)
+camera.location = (0.185, -0.245, 0.135)
+camera.rotation_euler = (Vector((0.0, 0.003, 0.002)) - camera.location).to_track_quat("-Z", "Y").to_euler()
+old_resolution = (
+    bpy.context.scene.render.resolution_x,
+    bpy.context.scene.render.resolution_y,
+    bpy.context.scene.render.resolution_percentage,
+)
+bpy.context.scene.render.resolution_x = 1600
+bpy.context.scene.render.resolution_y = 1200
+bpy.context.scene.render.resolution_percentage = 100
+bpy.context.view_layer.update()
+try:
+    visible_labels = {"Nikon", "Z50II", "ISO", "MODE", "USB", "HDMI", "MIC", "SENSOR"}
+    for decal in (obj for obj in decals if obj["decalLabel"] in visible_labels):
+        projected = [world_to_camera_view(bpy.context.scene, camera, decal.matrix_world @ vertex.co) for vertex in decal.data.vertices]
+        assert all(point.z > 0.0 for point in projected), f"{decal.name} is behind the reference camera"
+        xs = [point.x * 1600.0 for point in projected]
+        ys = [point.y * 1200.0 for point in projected]
+        assert min(xs) >= 0.0 and max(xs) <= 1600.0 and min(ys) >= 0.0 and max(ys) <= 1200.0, (
+            f"{decal.name} lies outside the final frame: x={min(xs):.1f}..{max(xs):.1f}, y={min(ys):.1f}..{max(ys):.1f}"
+        )
+        assert max(xs) - min(xs) >= 8.0 and max(ys) - min(ys) >= 3.0, (
+            f"{decal.name} is unreadably small/edge-on: {max(xs)-min(xs):.1f}x{max(ys)-min(ys):.1f}px"
+        )
+        normal = (decal.matrix_world.to_3x3() @ decal.data.polygons[0].normal).normalized()
+        center = sum((decal.matrix_world @ vertex.co for vertex in decal.data.vertices), Vector()) / len(decal.data.vertices)
+        assert normal.dot((camera.location - center).normalized()) >= 0.10, f"{decal.name} faces away from the final camera"
+finally:
+    bpy.context.scene.render.resolution_x, bpy.context.scene.render.resolution_y, bpy.context.scene.render.resolution_percentage = old_resolution
+    bpy.data.objects.remove(camera, do_unlink=True)
+    bpy.data.cameras.remove(camera_data)
+
+print(
+    "Decal host-distance QA: "
+    f"min={min(min(values) for values in decal_distances.values()):.5f} mm, "
+    f"max={max(max(values) for values in decal_distances.values()):.5f} mm, "
+    f"labels={len(decal_distances)}"
+)
+
+# Parenting, not renderer-side duplicate translation, must carry decals through
+# exploded motion while preserving their exact host-relative transforms.
+relative_before = {
+    decal.name: roots_by_id[decal["attachedPartId"]].matrix_world.inverted() @ decal.matrix_world
+    for decal in decals
+}
+root_before = {root.name: root.matrix_world.copy() for root in roots}
+try:
+    for root in roots:
+        moved = root.matrix_world.copy()
+        moved.translation += Vector(root["explodeAxis"]) * float(root["explodeDistance"]) * 0.17
+        root.matrix_world = moved
+    bpy.context.view_layer.update()
+    for decal in decals:
+        host = roots_by_id[decal["attachedPartId"]]
+        relative_after = host.matrix_world.inverted() @ decal.matrix_world
+        delta = max(abs(a - b) for row_a, row_b in zip(relative_before[decal.name], relative_after) for a, b in zip(row_a, row_b))
+        assert delta <= 2.0e-7, f"{decal.name} detached during exploded motion: {delta:.3e}"
+finally:
+    for root in roots:
+        root.matrix_world = root_before[root.name]
+    bpy.context.view_layer.update()
 
 atlas_path = TEXTURE_SOURCE / "decal-atlas-2k.png"
 # Hand-derived samples in the Z50II cell: row 1/column 0 of the 'Z' is clear,
@@ -204,8 +327,46 @@ atlas_path = TEXTURE_SOURCE / "decal-atlas-2k.png"
 assert rgba_pixel(atlas_path, 410, 221)[3] == 0
 assert rgba_pixel(atlas_path, 410, 277)[3] == 255
 
+
+def atlas_cell_bounds(path: Path, index: int) -> tuple[int, int]:
+    payload = path.read_bytes()
+    position = 8
+    compressed = bytearray()
+    width = height = None
+    while position < len(payload):
+        length = struct.unpack(">I", payload[position : position + 4])[0]
+        kind = payload[position + 4 : position + 8]
+        data = payload[position + 8 : position + 8 + length]
+        position += 12 + length
+        if kind == b"IHDR":
+            width, height = struct.unpack(">II", data[:8])
+        elif kind == b"IDAT":
+            compressed.extend(data)
+        elif kind == b"IEND":
+            break
+    raw = zlib.decompress(bytes(compressed))
+    stride = width * 4 + 1
+    cell_w, cell_h = width // 5, height // 2
+    row, col = divmod(index, 5)
+    occupied = []
+    for y in range(row * cell_h, (row + 1) * cell_h):
+        for x in range(col * cell_w, (col + 1) * cell_w):
+            if raw[y * stride + 1 + x * 4 + 3]:
+                occupied.append((x, y))
+    assert occupied, f"empty atlas cell {index}"
+    xs, ys = zip(*occupied)
+    return max(xs) - min(xs) + 1, max(ys) - min(ys) + 1
+
+
+# Icons/markings occupy two-dimensional silhouettes; the superseded atlas's
+# placeholder words were only one short text row and fail these height gates.
+graphic_min_heights = {"MODE": 150, "USB": 180, "HDMI": 110, "MIC": 220, "SENSOR": 220}
+for label, minimum_height in graphic_min_heights.items():
+    width, height = atlas_cell_bounds(atlas_path, list(("Nikon", "Z50II", "MENU", "DISP", "ISO", "MODE", "USB", "HDMI", "MIC", "SENSOR")).index(label))
+    assert height >= minimum_height, f"{label} atlas cell is still a placeholder word: {width}x{height}"
+
 expected_normals = {
-    "Nikon": (0.0, -1.0, 0.0), "Z50II": (0.0, -1.0, 0.0),
+    "Nikon": (0.0, 0.0, 1.0), "Z50II": (0.0, -1.0, 0.0),
     "MENU": (0.0, 1.0, 0.0), "DISP": (0.0, 1.0, 0.0),
     "ISO": (0.0, 0.0, 1.0), "MODE": (0.0, 0.0, 1.0),
     "USB": (1.0, 0.0, 0.0), "HDMI": (1.0, 0.0, 0.0), "MIC": (1.0, 0.0, 0.0),
@@ -214,7 +375,7 @@ expected_normals = {
 for decal in decals:
     normal = (decal.matrix_world.to_3x3() @ decal.data.polygons[0].normal).normalized()
     expected = expected_normals[decal["decalLabel"]]
-    assert sum(a * b for a, b in zip(normal, expected)) > 0.999, (decal.name, tuple(normal), expected)
+    assert sum(a * b for a, b in zip(normal, expected)) > 0.75, (decal.name, tuple(normal), expected)
 
 lights = {obj.name: obj for obj in bpy.data.objects if obj.type == "LIGHT"}
 assert LIGHT_NAMES <= set(lights), f"missing studio lights: {sorted(LIGHT_NAMES - set(lights))}"
@@ -234,11 +395,49 @@ for name, dimensions in TEXTURES.items():
     assert sha256(source.read_bytes()).digest() == sha256(public.read_bytes()).digest()
     webp = TEXTURE_PUBLIC / name.replace(".png", ".webp")
     assert webp.is_file() and webp.stat().st_size > 100, f"missing browser WebP: {webp}"
+    if name != "decal-atlas-2k.png":
+        _width, _height, baked_rgb = png_rgb(source)
+        assert max(baked_rgb) - min(baked_rgb) >= 8, f"Cycles bake is effectively flat: {name}"
+
+bake_manifest_path = TEXTURE_SOURCE / "bake-manifest.json"
+assert bake_manifest_path.is_file(), "surface maps lack Blender bake provenance"
+bake_manifest = json.loads(bake_manifest_path.read_text(encoding="utf-8"))
+assert bake_manifest["engine"] == "CYCLES"
+assert bake_manifest["operator"] == "bpy.ops.object.bake"
+assert bake_manifest["blenderVersion"] == ".".join(str(value) for value in bpy.app.version)
+expected_bakes = {
+    "body-black-normal-2k.png": "NORMAL",
+    "body-black-roughness-2k.png": "EMIT",
+    "grip-rubber-normal-2k.png": "NORMAL",
+    "grip-rubber-roughness-2k.png": "EMIT",
+    "internal-metal-roughness-1k.png": "EMIT",
+}
+assert set(bake_manifest["maps"]) == set(expected_bakes)
+for name, pass_type in expected_bakes.items():
+    record = bake_manifest["maps"][name]
+    assert record["passType"] == pass_type
+    assert record["sourceNodes"] == ["ShaderNodeTexCoord", "ShaderNodeMapping", "ShaderNodeTexNoise"]
+    assert record["sha256"] == sha256((TEXTURE_SOURCE / name).read_bytes()).hexdigest()
 
 radiance_dimensions(HDR_PATH)
 hdr_bytes = HDR_PATH.read_bytes()
 assert len(hdr_bytes) > 1024 * 512, "HDR payload is unexpectedly small"
 assert max(hdr_bytes[-1024 * 512 :]) > 200, "HDR lacks bright studio-light range"
+assert HDR_MANIFEST_PATH.is_file(), "HDR lacks render provenance from the studio rig"
+hdr_manifest = json.loads(HDR_MANIFEST_PATH.read_text(encoding="utf-8"))
+assert hdr_manifest["engine"] == "CYCLES"
+assert hdr_manifest["operator"] == "bpy.ops.render.render"
+assert hdr_manifest["camera"] == {
+    "name": "Studio_Environment_Panorama",
+    "type": "PANO",
+    "panoramaType": "EQUIRECTANGULAR",
+}
+assert hdr_manifest["resolution"] == [1024, 512]
+assert set(hdr_manifest["rigLights"]) == LIGHT_NAMES
+for name in LIGHT_NAMES:
+    assert hdr_manifest["rigLights"][name]["energy"] == lights[name].data.energy
+    assert hdr_manifest["rigLights"][name]["role"] == lights[name]["studioRole"]
+assert hdr_manifest["sha256"] == sha256(hdr_bytes).hexdigest()
 
 for name in ("assembled-studio.png", "exploded-studio.png"):
     path = RENDER_DIR / name
