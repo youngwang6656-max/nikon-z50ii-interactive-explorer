@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from math import cos, pi, sin
+
 import bpy
 
 from z50ii.constants import mm
 from z50ii.geometry import cylinder, rounded_box, torus
-from z50ii.materials import get_material
+from z50ii.materials import assign_material, get_material
 from z50ii.metadata import attach_part_metadata
 
 
@@ -17,7 +19,7 @@ PART_META = {
     "Z50II-07-002": ("Z50II-07-001", "液晶屏框架", "LCD frame", 8, (0, 1, 0), 28, ("Z50II-07-003",)),
     "Z50II-07-003": ("Z50II-07-002", "液晶显示面板", "LCD panel", 7, (0, 1, 0), 24, ("Z50II-07-004",)),
     "Z50II-07-004": ("Z50II-07-002", "液晶屏盖玻璃", "LCD cover glass", 6, (0, 1, 0), 20, ()),
-    "Z50II-07-005": ("Z50II-07-001", "液晶屏内侧铰臂", "Inner LCD hinge arm", 10, (1, 0, 0), 24, ("Z50II-07-007",)),
+    "Z50II-07-005": ("Z50II-07-001", "液晶屏内侧铰臂", "Inner LCD hinge arm", 10, (-1, 0, 0), 24, ("Z50II-07-007",)),
     "Z50II-07-006": ("Z50II-07-002", "液晶屏外侧铰臂", "Outer LCD hinge arm", 10, (0, 1, 0), 28, ("Z50II-07-007",)),
     "Z50II-07-007": ("Z50II-07-001", "液晶屏铰链转轴", "LCD hinge pivot", 9, (0, 0, 1), 60, ("Z50II-07-002", "Z50II-08-012", "Z50II-08-014", "Z50II-08-017")),
     "Z50II-07-008": ("Z50II-07-001", "菜单按钮", "MENU button", 3, (0, 1, 0), 16, ()),
@@ -76,6 +78,90 @@ def _seat(parent, name, location, radius, collection, material):
     return _parent(torus(name, radius + 0.65, 0.42, location, (90, 0, 0), collection, material), parent)
 
 
+def _hollow_knuckles(
+    name,
+    pivot_center_mm,
+    intervals_mm,
+    outer_radius_mm,
+    bore_radius_mm,
+    collection,
+    material,
+    *,
+    segments=64,
+):
+    """Build one or more closed annular hinge sleeves on a shared Z axis."""
+    vertices = []
+    faces = []
+    for lower_mm, upper_mm in intervals_mm:
+        base = len(vertices)
+        for radius_mm, z_mm in (
+            (outer_radius_mm, lower_mm),
+            (outer_radius_mm, upper_mm),
+            (bore_radius_mm, lower_mm),
+            (bore_radius_mm, upper_mm),
+        ):
+            for index in range(segments):
+                angle = 2.0 * pi * index / segments
+                vertices.append(
+                    (
+                        mm(radius_mm * cos(angle)),
+                        mm(radius_mm * sin(angle)),
+                        mm(z_mm),
+                    )
+                )
+        outer_bottom = base
+        outer_top = base + segments
+        inner_bottom = base + 2 * segments
+        inner_top = base + 3 * segments
+        for index in range(segments):
+            following = (index + 1) % segments
+            faces.extend(
+                (
+                    (
+                        outer_bottom + index,
+                        outer_bottom + following,
+                        outer_top + following,
+                        outer_top + index,
+                    ),
+                    (
+                        inner_bottom + index,
+                        inner_top + index,
+                        inner_top + following,
+                        inner_bottom + following,
+                    ),
+                    (
+                        outer_bottom + index,
+                        inner_bottom + index,
+                        inner_bottom + following,
+                        outer_bottom + following,
+                    ),
+                    (
+                        outer_top + index,
+                        outer_top + following,
+                        inner_top + following,
+                        inner_top + index,
+                    ),
+                )
+            )
+    mesh = bpy.data.meshes.new(f"{name}_mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    obj.location = tuple(mm(value) for value in pivot_center_mm)
+    collection.objects.link(obj)
+    assign_material(obj, material)
+    for polygon in mesh.polygons:
+        polygon.use_smooth = True
+    return obj
+
+
+def _hinge_web(parent, name, size, location, bevel, collection, material, *, attachment):
+    web = _parent(rounded_box(name, size, location, bevel, collection, material), parent)
+    web["hingeOwnerPartId"] = parent["partId"] if parent.get("partId") else name.split("_")[0]
+    web["knuckleAttachment"] = attachment
+    return web
+
+
 def build_rear_lcd_controls() -> list[bpy.types.Object]:
     collection = bpy.data.collections[MODULE_ID]
     _clear(collection)
@@ -93,7 +179,10 @@ def build_rear_lcd_controls() -> list[bpy.types.Object]:
     for suffix, size, location in (
         ("bottom", (105.0, 1.65, 3.0), (0.5, 35.0, -33.0)),
         ("left", (3.0, 1.65, 61.0), (-52.0, 35.0, -1.0)),
-        ("right", (3.0, 1.65, 61.0), (53.0, 35.0, -1.0)),
+        # Split the right rail around the physical hinge pocket instead of
+        # passing a solid shell member through the annular knuckles.
+        ("right_upper", (3.0, 1.65, 16.6), (53.0, 35.0, 21.7)),
+        ("right_lower", (3.0, 1.65, 14.6), (53.0, 35.0, -24.7)),
         ("control_top_return", (8.0, 1.65, 3.0), (-48.5, 35.0, 31.0)),
     ):
         _parent(rounded_box(f"Z50II-07-001_rear_shell_{suffix}", size, location, 0.50, collection, shell_mat), rear_shell)
@@ -144,20 +233,56 @@ def build_rear_lcd_controls() -> list[bpy.types.Object]:
     screen_pivot["purpose"] = "Browser animation pivot for the complete rear LCD screen group"
     collection.objects.link(screen_pivot)
 
-    inner_arm = cylinder("Z50II-07-005_inner_hinge_arm", 3.0, 5.0, pivot_center, (0, 0, 0), collection, hinge_mat, vertices=40)
-    _parent(rounded_box("Z50II_inner_hinge_arm_web", (2.4, 1.5, 31.0), (48.0, 34.75, -2.0), 0.55, collection, hinge_mat), inner_arm)
-    _parent(rounded_box("Z50II_inner_hinge_arm_body_land", (7.0, 2.0, 4.0), (46.0, 34.3, -17.0), 0.75, collection, hinge_mat), inner_arm)
+    inner_arm = _hollow_knuckles(
+        "Z50II-07-005_inner_hinge_arm",
+        pivot_center,
+        ((-15.0, -6.0), (6.0, 15.0)),
+        3.0,
+        1.65,
+        collection,
+        hinge_mat,
+    )
     inner_arm["pivotOriginMm"] = list(pivot_center)
     inner_arm["pivotAxis"] = [0.0, 0.0, 1.0]
     inner_arm["kinematicRole"] = "stationary"
+    inner_arm["boreRadiusMm"] = 1.65
+    inner_arm["outerRadiusMm"] = 3.0
+    inner_arm["knuckleZIntervalsMm"] = [-17.0, -8.0, 4.0, 13.0]
     _annotate(inner_arm, "Z50II-07-005", "由机身侧轴套、竖向连杆和下端安装面构成的内侧铰臂。", "Inner hinge arm with body-side hub, vertical link, and lower mounting land.")
+    for suffix, location in (("lower", (44.9, 34.75, -12.5)), ("upper", (44.9, 34.75, 8.5))):
+        _hinge_web(
+            inner_arm,
+            f"Z50II_inner_hinge_arm_{suffix}_bridge",
+            (3.8, 0.8, 3.0),
+            location,
+            0.35,
+            collection,
+            hinge_mat,
+            attachment=True,
+        )
+    _hinge_web(inner_arm, "Z50II_inner_hinge_arm_spine", (2.4, 0.8, 25.5), (41.9, 34.75, -4.25), 0.36, collection, hinge_mat, attachment=False)
+    _hinge_web(inner_arm, "Z50II_inner_hinge_arm_body_land", (5.0, 1.8, 4.0), (43.0, 34.3, -17.0), 0.65, collection, hinge_mat, attachment=False)
 
-    outer_arm = cylinder("Z50II-07-006_outer_hinge_arm", 1.65, 3.2, pivot_center, (0, 0, 0), collection, hinge_mat, vertices=40)
-    _parent(rounded_box("Z50II_outer_hinge_arm_web", (1.8, 1.3, 30.0), (46.0, 36.2, -2.0), 0.50, collection, hinge_mat), outer_arm)
-    _parent(rounded_box("Z50II_outer_hinge_arm_screen_land", (5.5, 1.6, 4.0), (44.5, 36.4, 18.0), 0.65, collection, hinge_mat), outer_arm)
+    outer_arm = _hollow_knuckles(
+        "Z50II-07-006_outer_hinge_arm",
+        pivot_center,
+        ((-5.6, 5.6),),
+        2.8,
+        1.65,
+        collection,
+        hinge_mat,
+    )
     outer_arm["pivotOriginMm"] = list(pivot_center)
     outer_arm["pivotAxis"] = [0.0, 0.0, 1.0]
+    outer_arm["boreRadiusMm"] = 1.65
+    outer_arm["outerRadiusMm"] = 2.8
+    outer_arm["knuckleZIntervalsMm"] = [-7.6, 3.6]
     _annotate(outer_arm, "Z50II-07-006", "连接关闭屏幕框的外侧铰臂，与内臂共享动画转轴原点。", "Outer hinge arm connecting the closed screen frame and sharing the animation pivot with the inner arm.")
+    _hinge_web(outer_arm, "Z50II_outer_hinge_arm_bridge", (4.0, 1.3, 3.0), (45.0, 36.2, -2.0), 0.35, collection, hinge_mat, attachment=True)
+    _hinge_web(outer_arm, "Z50II_outer_hinge_arm_lower_elbow", (1.8, 3.2, 3.0), (43.0, 37.7, -2.0), 0.38, collection, hinge_mat, attachment=False)
+    _hinge_web(outer_arm, "Z50II_outer_hinge_arm_spine", (1.8, 1.3, 20.0), (43.0, 39.0, 8.0), 0.42, collection, hinge_mat, attachment=False)
+    _hinge_web(outer_arm, "Z50II_outer_hinge_arm_upper_elbow", (1.8, 3.2, 2.0), (43.0, 37.7, 18.0), 0.38, collection, hinge_mat, attachment=False)
+    _hinge_web(outer_arm, "Z50II_outer_hinge_arm_screen_land", (5.5, 1.6, 4.0), (44.5, 36.4, 18.0), 0.65, collection, hinge_mat, attachment=False)
 
     hinge_pivot = cylinder("Z50II-07-007_hinge_pivot", 1.45, 34.0, pivot_center, (0, 0, 0), collection, hinge_mat, vertices=40)
     hinge_pivot["pivotOriginMm"] = list(pivot_center)
@@ -166,6 +291,9 @@ def build_rear_lcd_controls() -> list[bpy.types.Object]:
     hinge_pivot["openAngleDeg"] = -105.0
     hinge_pivot["motionGroupId"] = "rear-lcd-screen"
     hinge_pivot["kinematicRole"] = "axis"
+    hinge_pivot["pinRadiusMm"] = 1.45
+    hinge_pivot["pinZIntervalMm"] = [-19.0, 15.0]
+    hinge_pivot["solidPin"] = True
     _annotate(hinge_pivot, "Z50II-07-007", "贯穿两支铰臂的竖直金属转轴，为后续开屏动画提供同轴基准。", "Vertical metal pivot through both hinge arms, providing the coaxial basis for a later open-screen animation.")
 
     for moving in (lcd_frame, lcd_panel, cover_glass, outer_arm):

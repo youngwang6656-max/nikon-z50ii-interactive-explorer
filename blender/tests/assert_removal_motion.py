@@ -21,7 +21,7 @@ if str(TESTS_ROOT) not in sys.path:
 
 from root_contact_contract import ALLOWED_ROOT_CONTACTS
 
-MAX_SAMPLE_SPACING = 0.0005
+MAX_SAMPLE_SPACING = 0.00025
 parts = {obj["partId"]: obj for obj in bpy.data.objects if obj.get("partId")}
 assert len(parts) == 100
 depsgraph = bpy.context.evaluated_depsgraph_get()
@@ -281,5 +281,5 @@ print(
     "Removal-motion audit passed: "
     f"free_roots={len(parts)}, free_samples={free_samples}, "
     f"guided_groups={sum(1 for step in range(1, 41) if sum(root['step'] == step for root in parts.values()) > 1)}, "
-    f"guided_samples={guided_samples}, max_spacing_mm={MAX_SAMPLE_SPACING * 1000.0:.1f}"
+    f"guided_samples={guided_samples}, max_spacing_mm={MAX_SAMPLE_SPACING * 1000.0:.2f}"
 )

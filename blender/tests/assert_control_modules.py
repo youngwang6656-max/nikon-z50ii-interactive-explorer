@@ -50,7 +50,7 @@ EXPECTED_CONTROL_PARTS = {
         "Z50II-07-002": ("Z50II-07-002_lcd_frame", "液晶屏框架", "LCD frame", 8, (0.0, 1.0, 0.0), 28.0, ("Z50II-07-003",)),
         "Z50II-07-003": ("Z50II-07-003_lcd_panel", "液晶显示面板", "LCD panel", 7, (0.0, 1.0, 0.0), 24.0, ("Z50II-07-004",)),
         "Z50II-07-004": ("Z50II-07-004_lcd_cover_glass", "液晶屏盖玻璃", "LCD cover glass", 6, (0.0, 1.0, 0.0), 20.0, ()),
-        "Z50II-07-005": ("Z50II-07-005_inner_hinge_arm", "液晶屏内侧铰臂", "Inner LCD hinge arm", 10, (1.0, 0.0, 0.0), 24.0, ("Z50II-07-007",)),
+        "Z50II-07-005": ("Z50II-07-005_inner_hinge_arm", "液晶屏内侧铰臂", "Inner LCD hinge arm", 10, (-1.0, 0.0, 0.0), 24.0, ("Z50II-07-007",)),
         "Z50II-07-006": ("Z50II-07-006_outer_hinge_arm", "液晶屏外侧铰臂", "Outer LCD hinge arm", 10, (0.0, 1.0, 0.0), 28.0, ("Z50II-07-007",)),
         "Z50II-07-007": ("Z50II-07-007_hinge_pivot", "液晶屏铰链转轴", "LCD hinge pivot", 9, (0.0, 0.0, 1.0), 60.0, ("Z50II-07-002", "Z50II-08-012", "Z50II-08-014", "Z50II-08-017")),
         "Z50II-07-008": ("Z50II-07-008_menu_button", "菜单按钮", "MENU button", 3, (0.0, 1.0, 0.0), 16.0, ()),
@@ -369,33 +369,27 @@ for first_id, second_id in checked_pairs:
 assert not unexpected_intersections, f"Task-7 selectable-root interpenetration: {sorted(unexpected_intersections)}"
 
 # Sample the physical open sweeps around the stored origins. The complete LCD
-# motion group swings rearward around Z; only its coaxial hinge interfaces may
-# stay in contact with stationary roots.
+# motion group swings rearward around Z. Its annular moving knuckle remains
+# surface-clear of both the stationary knuckles and the solid pivot pin.
 lcd_pivot_m = Vector(parts["Z50II-07-007"]["pivotOriginMm"]) / 1000.0
 assert parts["Z50II-07-007"]["openAngleDeg"] == -105.0
 stationary_lcd_ids = sorted(set(parts) - moving_lcd_ids)
 stationary_lcd_bvhs = {
     part_id: transformed_root_bvh(parts[part_id]) for part_id in stationary_lcd_ids
 }
-allowed_lcd_sweep_contacts = {
-    frozenset(("Z50II-07-005", "Z50II-07-006")),
-    frozenset(("Z50II-07-006", "Z50II-07-007")),
-}
 lcd_sweep_failures = {}
-for angle in (-15, -30, -45, -60, -75, -90, -105):
+for angle in range(-1, -106, -1):
     transform = Matrix.Translation(lcd_pivot_m) @ Matrix.Rotation(radians(angle), 4, "Z") @ Matrix.Translation(-lcd_pivot_m)
     overlaps = []
     for moving_id in sorted(moving_lcd_ids):
         moving_tree = transformed_root_bvh(parts[moving_id], transform)
         for stationary_id in stationary_lcd_ids:
-            pair = frozenset((moving_id, stationary_id))
-            if pair in allowed_lcd_sweep_contacts:
-                continue
             if moving_tree.overlap(stationary_lcd_bvhs[stationary_id]):
                 overlaps.append((moving_id, stationary_id))
     if overlaps:
         lcd_sweep_failures[angle] = overlaps
 assert not lcd_sweep_failures, lcd_sweep_failures
+print("LCD kinematic sweep passed: angles=-1..-105, increment_deg=1, exemptions=0")
 
 flash_pivot_m = Vector(flash_head["pivotOriginMm"]) / 1000.0
 top_shell_bvh = transformed_root_bvh(parts["Z50II-02-003"])

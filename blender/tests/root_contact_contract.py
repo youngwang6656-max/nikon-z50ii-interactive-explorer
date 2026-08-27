@@ -89,19 +89,9 @@ TASK7_ROOT_CONTACTS = {
     **_pairs(
         (
             ("Z50II-07-001", "Z50II-07-002"),
-            ("Z50II-07-001", "Z50II-07-005"),
-            ("Z50II-07-002", "Z50II-07-005"),
             ("Z50II-07-002", "Z50II-07-006"),
         ),
         "closed LCD carrier/hinge land seated against its body-side stop",
-    ),
-    **_pairs(
-        (
-            ("Z50II-07-005", "Z50II-07-006"),
-            ("Z50II-07-005", "Z50II-07-007"),
-            ("Z50II-07-006", "Z50II-07-007"),
-        ),
-        "coaxial LCD hinge sleeve/pivot interface",
     ),
     frozenset(("Z50II-08-009", "Z50II-08-018")): (
         "cable clamp deliberately bears on the routed sensor-flex surface"
@@ -149,6 +139,6 @@ TASK7_ROOT_CONTACTS = {
 ALLOWED_ROOT_CONTACTS = {**LEGACY_ROOT_CONTACTS, **TASK7_ROOT_CONTACTS}
 
 assert len(LEGACY_ROOT_CONTACTS) == 32
-assert len(TASK7_ROOT_CONTACTS) == 28
-assert len(ALLOWED_ROOT_CONTACTS) == 60
+assert len(TASK7_ROOT_CONTACTS) == 23
+assert len(ALLOWED_ROOT_CONTACTS) == 55
 assert all(len(pair) == 2 and reason for pair, reason in ALLOWED_ROOT_CONTACTS.items())

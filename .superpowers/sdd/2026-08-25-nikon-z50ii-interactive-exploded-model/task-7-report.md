@@ -39,6 +39,20 @@ declared distance at no more than 0.5 mm spacing. This remained RED while the
 restored high-detail front shell exposed additional real service obstructions,
 then went GREEN only after the physical corridors and dependencies were fixed.
 
+Review round 2 added a containment-aware hinge contract before changing the
+model. Against `c51cef7`, evaluated center-axis rays produced the intended RED:
+
+```text
+AssertionError: Z50II-07-005 blocks its nominal hinge bore
+```
+
+The contract does not infer geometry from object names. It inspects evaluated
+manifold meshes, measures axial intervals and four radial cross-sections, tests
+the center bore directly, checks the pin as one capped solid, and verifies each
+web intersects only its own knuckle. It then drove the replacement of the two
+nested solid hubs with three complementary annular knuckle spans and a single
+clearance-fit pin.
+
 Final GREEN output includes:
 
 ```text
@@ -49,13 +63,17 @@ Exterior detail contract passed: export_nodes=180, bad_determinants=0,
 Internal assertion passed: 12 imaging + 12 mainboard + 8 power/storage = 32; catalog=60
 Internal geometry passed: selectable_intersections=0, task6_pairs_checked=495/496,
   retained_pairs=896, sweeps=8 clear
-Internal rebuild idempotence passed: objects=628, meshes=619, task_parts=32,
+Internal rebuild idempotence passed: objects=634, meshes=625, task_parts=32,
   task_nodes=258, task_meshes=258, orphan_task_meshes=0
 Build save guard passed: invalid catalog preserved the existing artifact byte-for-byte
 Exterior assertion accepted a synthetic future-module part
 Z50II scene validation passed
-Removal-motion audit passed: free_roots=100, free_samples=5234,
-  guided_groups=18, guided_samples=1126, max_spacing_mm=0.5
+Removal-motion audit passed: free_roots=100, free_samples=10468,
+  guided_groups=18, guided_samples=2252, max_spacing_mm=0.25
+LCD hinge geometry passed: pin_radius_mm=1.45, bore_radius_mm=1.65,
+  radial_clearance_mm=0.20, inner_intervals_mm=((-17,-8),(4,13)),
+  outer_intervals_mm=((-7.6,3.6),), axial_gaps_mm=(0.40,0.40)
+LCD kinematic sweep passed: angles=-1..-105, increment_deg=1, exemptions=0
 Blender runner exit-code smoke passed: failure=1 success=0
 ```
 
@@ -76,6 +94,13 @@ Blender runner exit-code smoke passed: failure=1 success=0
   explicit `rear-lcd-screen` motion metadata without changing closed assembly
   transforms. Body-side inner arm `07-005` remains stationary. Menu, playback,
   delete, four-way pad, and OK controls have real bores and receiving seats.
+- The common hinge now uses one solid 1.45 mm-radius pin inside genuine 1.65
+  mm-radius bores. The stationary arm has annular knuckles over absolute Z
+  spans `[-17,-8]` and `[4,13] mm`; the moving arm occupies `[-7.6,3.6] mm`.
+  The resulting radial clearance is 0.20 mm and both inter-knuckle axial gaps
+  are 0.40 mm. The shell rail is split around this physical hinge pocket. The
+  moving arm uses a rearward dog-leg outside the stationary sleeve's service
+  sweep, while the stationary arm has a clear `-X`, 24 mm removal path.
 - The port group distinguishes a symmetric Type-C shell, trapezoidal Type-D
   HDMI shell, and two cylindrical 3.5 mm jack forms. All align with their shell
   tunnels/doors and seat on the I/O daughterboard.
@@ -98,18 +123,25 @@ Blender runner exit-code smoke passed: failure=1 success=0
 - Task-7 assembled coverage: 3,180 new/new plus new/retained selectable-root
   pairs, with zero non-allowlisted evaluated BVH intersections.
 - The global contact contract was reduced from 104 broad/pre-emptive entries to
-  60 currently observed intentional interfaces (`32` legacy + `28` Task 7).
+  55 currently observed intentional interfaces (`32` legacy + `23` Task 7).
   Every retained entry is documented and the tests fail if any exception is
-  unused. No broad LCD arm/shell exception remains.
-- Complete motion coverage is `100` free roots / `5,234` samples and `18`
-  guided multi-root operations / `1,126` samples at `<=0.5 mm`, with zero
+  unused. All five cross-root LCD hinge/arm exemptions were removed; there is
+  no sleeve/pin, arm/arm, or arm/shell blanket exception.
+- Complete motion coverage is `100` free roots / `10,468` samples and `18`
+  guided multi-root operations / `2,252` samples at `<=0.25 mm`, with zero
   failures.
-- LCD sweep samples: `-15/-30/-45/-60/-75/-90/-105°`, all clear.
+- LCD sweep samples every integer degree from `-1°` through `-105°`, all clear
+  against every stationary selectable root with zero hinge exemptions.
+- The same strict audit verifies the pivot's full `+Z`, 60 mm withdrawal, the
+  outer arm's full `+Y`, 28 mm removal, and the inner arm's `-X`, 24 mm service
+  path after only their transitive prerequisite closures are removed.
 - Flash sweep samples: `-12/-24/-36/-48/-60/-72°`, all clear; the open head
   also has a clear sampled `+Z` removal path.
 - All Task-7 export nodes have finite positive world determinants.
 - Rebuilding Modules 06–08 twice preserves object/mesh signatures, linked screw
-  mesh identity, and zero orphan `Z50II*` meshes.
+  mesh identity, and zero orphan `Z50II*` meshes. The full internal idempotence
+  audit reports `634` objects, `625` meshes, `258` Task-6 nodes/meshes, and zero
+  orphan Task-6 meshes after the annular-hinge additions.
 - The legacy Task-6 service sweep is explicitly future-module-safe (Modules
   01–05), while the Task-7 test supplies complete cross-module coverage.
 - Side-cover handedness is protected by evaluated seat proximity. `02-005`
@@ -122,9 +154,9 @@ Blender runner exit-code smoke passed: failure=1 success=0
   strict-earlier dependencies, and no cycle.
 - `scripts/run-blender.ps1` injects `--python-exit-code 1` for every invocation.
   A deliberate Python exception returns `1`; the success smoke returns `0`.
-- Fresh source artifact: `9,412,813` bytes, UTC
-  `2026-08-26T14:41:03.7665504Z`, SHA-256
-  `F43F1DE63183DFDB1BB4340AB640CC44154AE23BA67CA228502B19A179698B80`.
+- Fresh source artifact: `9,493,208` bytes, UTC
+  `2026-08-27T04:47:11.7145830Z`, SHA-256
+  `DB3C2C466134B249088D2A3FF6E6D0CE8F89881A3280F7D37AA8C7FC33850A5B`.
 
 ## Visual QA
 
@@ -139,6 +171,14 @@ layout inversion. The LCD-open view showed frame, panel, glass, and outer arm
 moving as one rigid group around the physical pivot while the inner arm remained
 with the body. The temporary render directory and helper script were removed.
 
+Review round 2 also generated and inspected dedicated 1000 x 800 closed/open
+hinge close-ups at original resolution. The closed view showed three axially
+staggered metal knuckles around one continuous pin and the split shell pocket;
+the `-75°` view showed the LCD stack and rearward dog-leg moving as one group
+while the two body-side knuckles stayed fixed. No visual jump, inverted pose, or
+obvious surface penetration was present. These temporary close-ups and their
+helper were removed after inspection.
+
 ## Files
 
 - `blender/build_master.py`
@@ -151,6 +191,7 @@ with the body. The temporary render directory and helper script were removed.
 - `blender/z50ii/modules/mainboard_thermal.py`
 - `blender/z50ii/modules/power_storage.py`
 - `blender/tests/assert_control_modules.py`
+- `blender/tests/assert_lcd_hinge_geometry.py`
 - `blender/tests/assert_removal_motion.py`
 - `blender/tests/root_contact_contract.py`
 - `blender/tests/assert_exterior_modules.py`
@@ -172,4 +213,5 @@ The folded flash cassette is engineered for a deterministic clear teaching
 motion rather than claiming Nikon's exact internal linkage. The master artifact
 was rebuilt for verification but remains untracked and is excluded from the fix
 commit; procedural sources remain authoritative. Review-round fixes are recorded
-in the separate commit titled `fix: close Task 7 removal and kinematic regressions`.
+in separate commits titled `fix: close Task 7 removal and kinematic regressions`
+and `fix: model physical LCD hinge knuckles`.
