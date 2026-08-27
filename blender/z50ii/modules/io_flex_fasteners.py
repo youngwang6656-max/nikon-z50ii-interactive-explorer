@@ -21,10 +21,10 @@ PART_META = {
     "Z50II-08-004": ("Z50II-08-005", "3.5毫米输出／遥控接口", "3.5 mm output/remote jack", 21, (1, 0, 0), 22, ("Z50II-02-005", "Z50II-02-009", "Z50II-08-010")),
     "Z50II-08-005": ("Z50II-04-001", "接口子板", "I/O daughterboard", 22, (1, 0, 0), 30, ("Z50II-08-001", "Z50II-08-002", "Z50II-08-003", "Z50II-08-004", "Z50II-08-010")),
     "Z50II-08-006": ("Z50II-07-001", "Wi-Fi／Bluetooth天线", "Wi-Fi/Bluetooth antenna", 20, (0, 1, 0), 22, ("Z50II-07-001", "Z50II-08-008")),
-    "Z50II-08-007": ("Z50II-06-010", "顶部控制排线", "Top-control flex cable", 19, (0, 1, 0), 24, ("Z50II-02-003", "Z50II-08-018")),
+    "Z50II-08-007": ("Z50II-06-010", "顶部控制排线", "Top-control flex cable", 19, (0, 1, 0), 24, ("Z50II-02-001", "Z50II-02-003", "Z50II-08-018")),
     "Z50II-08-008": ("Z50II-07-001", "后部控制排线", "Rear-control flex cable", 19, (0, 1, 0), 24, ("Z50II-07-001", "Z50II-08-018")),
     "Z50II-08-009": ("Z50II-03-011", "传感器排线", "Sensor flex cable", 19, (0, 1, 0), 26, ("Z50II-02-001", "Z50II-07-001", "Z50II-08-018")),
-    "Z50II-08-010": ("Z50II-08-005", "接口板排线", "Port flex cable", 19, (1, 0, 0), 24, ("Z50II-02-005", "Z50II-08-018")),
+    "Z50II-08-010": ("Z50II-08-005", "接口板排线", "Port flex cable", 19, (1, 0, 0), 24, ("Z50II-02-001", "Z50II-02-005", "Z50II-08-018")),
     "Z50II-08-011": ("Z50II-02-003", "左上机壳螺钉", "Upper-left shell screw", 1, (0, 1, 0), 18, ()),
     "Z50II-08-012": ("Z50II-02-003", "右上机壳螺钉", "Upper-right shell screw", 1, (0, 1, 0), 18, ()),
     "Z50II-08-013": ("Z50II-07-001", "左后机壳螺钉", "Rear-left shell screw", 1, (0, 1, 0), 20, ()),
@@ -32,7 +32,7 @@ PART_META = {
     "Z50II-08-015": ("Z50II-02-004", "左下机壳螺钉", "Bottom-left shell screw", 1, (0, 0, -1), 18, ()),
     "Z50II-08-016": ("Z50II-02-004", "右下机壳螺钉", "Bottom-right shell screw", 1, (0, 0, -1), 18, ()),
     "Z50II-08-017": ("Z50II-01-001", "机壳垫圈组", "Shell washer set", 2, (0, 1, 0), 16, ("Z50II-08-011", "Z50II-08-012", "Z50II-08-013", "Z50II-08-014", "Z50II-08-015", "Z50II-08-016")),
-    "Z50II-08-018": ("Z50II-01-001", "排线压板", "Cable clamp", 18, (0, 1, 0), 18, ("Z50II-02-005", "Z50II-07-001")),
+    "Z50II-08-018": ("Z50II-01-001", "排线压板", "Cable clamp", 18, (-1, 0, 0), 18, ("Z50II-02-005", "Z50II-07-001")),
 }
 
 
@@ -165,11 +165,11 @@ def build_io_flex_fasteners() -> list[bpy.types.Object]:
     top_flex = _flex_with_ends("Z50II-08-007_top_flex_cable", ((-43.0, 12.0, 31.8), (-34.0, 18.0, 31.5), (-28.0, 24.0, 31.0), (-28.0, 29.0, 18.0), (-22.0, 29.0, 8.0)), 2.4, collection, flex_mat, insulator)
     top_flex["shellPassThrough"] = "top-control service aperture"
     _annotate(top_flex, "Z50II-08-007", "从顶部控制板沿肩部折弯至后部连接区的五段排线。", "Five-segment flex routed from the top-control board around the shoulder to the rear connector zone.")
-    rear_flex = _flex_with_ends("Z50II-08-008_rear_flex_cable", ((40.0, 32.0, -22.0), (35.0, 32.0, -23.0), (28.0, 31.8, -23.0), (19.0, 31.8, -21.0), (10.0, 31.5, -20.0)), 2.6, collection, flex_mat, insulator)
+    rear_flex = _flex_with_ends("Z50II-08-008_rear_flex_cable", ((40.0, 32.0, 18.0), (35.0, 32.0, 20.0), (28.0, 31.8, 21.0), (19.0, 31.8, 20.0), (10.0, 31.5, 18.0)), 2.6, collection, flex_mat, insulator)
     _annotate(rear_flex, "Z50II-08-008", "绕过屏幕铰链并沿后壳内侧转折的控制排线。", "Rear-control flex bending around the LCD hinge and along the inner rear shell.")
-    sensor_flex = _flex_with_ends("Z50II-08-009_sensor_flex_cable", ((0.0, 16.5, -9.0), (25.0, 16.5, -9.0), (40.0, 18.0, -15.0), (40.0, 29.5, -15.0), (28.0, 31.5, -12.0), (18.0, 31.5, -10.0)), 1.0, collection, flex_mat, insulator)
+    sensor_flex = _flex_with_ends("Z50II-08-009_sensor_flex_cable", ((18.0, 16.5, -10.0), (20.0, 16.5, -10.0), (20.0, 20.0, -14.0), (20.0, 29.5, -14.0), (19.0, 31.5, -12.0), (18.0, 31.5, -10.0)), 1.0, collection, flex_mat, insulator)
     _annotate(sensor_flex, "Z50II-08-009", "从固定式传感器载板后缘弯折至主板连接区的宽排线。", "Wide flex bending from the fixed sensor carrier edge to the main-board connector zone.")
-    port_flex = _flex_with_ends("Z50II-08-010_port_flex_cable", ((47.0, 17.0, -18.5), (44.0, 21.0, -18.0), (38.0, 27.5, -15.0), (30.0, 28.0, -12.0), (18.0, 28.0, -10.0)), 2.2, collection, flex_mat, insulator)
+    port_flex = _flex_with_ends("Z50II-08-010_port_flex_cable", ((47.0, 17.0, -18.5), (44.0, 21.0, -23.0), (38.0, 27.5, -26.0), (30.0, 28.0, -24.0), (18.0, 28.0, -22.0)), 2.2, collection, flex_mat, insulator)
     _annotate(port_flex, "Z50II-08-010", "从侧置接口板绕至后部连接器的四次转折排线。", "Port-board flex making four controlled bends to the rear connector bank.")
 
     screw_specs = (
@@ -211,10 +211,16 @@ def build_io_flex_fasteners() -> list[bpy.types.Object]:
         for slot_index, slot_size in enumerate(slot_sizes, start=1):
             _parent(rounded_box(f"{screw.name}_cross_slot_{slot_index}", slot_size, slot_location, 0.08, collection, insulator), screw)
 
-    washer_locations = tuple(spec[2] for spec in screw_specs)
-    washers = torus("Z50II-08-017_washer_set", 2.0, 0.35, washer_locations[0], (90, 0, 0), collection, fastener_mat)
+    # Seat each washer under its screw head but slightly outside the shell
+    # surface. This preserves the six true annuli and gives the selectable set
+    # a collision-free rearward magnetic-tool service path.
+    washer_locations = tuple(
+        tuple(location[index] + PART_META[part_id][4][index] * 4.0 for index in range(3))
+        for part_id, _name, location, _rotation in screw_specs
+    )
+    washers = torus("Z50II-08-017_washer_set", 2.6, 0.30, washer_locations[0], (90, 0, 0), collection, fastener_mat)
     for index, (location, rotation) in enumerate(zip(washer_locations[1:], (spec[3] for spec in screw_specs[1:])), start=2):
-        _parent(torus(f"Z50II_shell_washer_{index}", 2.0, 0.35, location, rotation, collection, fastener_mat), washers)
+        _parent(torus(f"Z50II_shell_washer_{index}", 2.6, 0.30, location, rotation, collection, fastener_mat), washers)
     washers["washerCount"] = 6
     _annotate(washers, "Z50II-08-017", "六枚与机壳螺钉座对应的独立环形垫圈组成一个选择组。", "Selectable set of six annular washers corresponding to the six shell-screw seats.")
 

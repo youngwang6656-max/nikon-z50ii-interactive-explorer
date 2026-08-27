@@ -238,14 +238,14 @@ seat_pads = (
     bpy.data.objects["Z50II_mount_recessed_seat_4"],
 )
 seat_pad_hits = {
-    pad.name: radial_ray_hits(pad, 32.0, sample_count=72)
+    pad.name: radial_ray_hits(pad, 36.0, sample_count=72)
     for pad in seat_pads
 }
 for pad, expected_angle in zip(seat_pads, seat_angles):
-    origin = Vector((32.0 * cos(radians(expected_angle)) / 1000.0, -0.006, 32.0 * sin(radians(expected_angle)) / 1000.0))
+    origin = Vector((36.0 * cos(radians(expected_angle)) / 1000.0, -0.006, 36.0 * sin(radians(expected_angle)) / 1000.0))
     assert object_bvh(pad).ray_cast(origin, Vector((0.0, 1.0, 0.0)), 0.012)[0] is not None
 for gap_angle in (0, 90, 180, 270):
-    origin = Vector((32.0 * cos(radians(gap_angle)) / 1000.0, -0.006, 32.0 * sin(radians(gap_angle)) / 1000.0))
+    origin = Vector((36.0 * cos(radians(gap_angle)) / 1000.0, -0.006, 36.0 * sin(radians(gap_angle)) / 1000.0))
     assert all(object_bvh(pad).ray_cast(origin, Vector((0.0, 1.0, 0.0)), 0.012)[0] is None for pad in seat_pads)
 assert all(0 < hit_count <= 4 for hit_count in seat_pad_hits.values()), seat_pad_hits
 ring_hits = radial_ray_hits(mount_ring, 28.8)

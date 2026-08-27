@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import bpy
 
+from z50ii.constants import mm
 from z50ii.geometry import cylinder, rounded_box, torus
 from z50ii.materials import get_material
 from z50ii.metadata import attach_part_metadata
@@ -12,13 +13,13 @@ from z50ii.metadata import attach_part_metadata
 MODULE_ID = "07_rear_lcd_controls"
 
 PART_META = {
-    "Z50II-07-001": ("Z50II-02-001", "后壳", "Rear shell", 11, (0, 1, 0), 45, ("Z50II-07-005", "Z50II-07-006", "Z50II-07-008", "Z50II-07-009", "Z50II-07-010", "Z50II-07-011", "Z50II-07-012", "Z50II-08-013", "Z50II-08-014")),
+    "Z50II-07-001": ("Z50II-02-001", "后壳", "Rear shell", 11, (0, 1, 0), 45, ("Z50II-07-005", "Z50II-07-006", "Z50II-07-008", "Z50II-07-009", "Z50II-07-010", "Z50II-07-011", "Z50II-07-012", "Z50II-08-013", "Z50II-08-014", "Z50II-08-017")),
     "Z50II-07-002": ("Z50II-07-001", "液晶屏框架", "LCD frame", 8, (0, 1, 0), 28, ("Z50II-07-003",)),
     "Z50II-07-003": ("Z50II-07-002", "液晶显示面板", "LCD panel", 7, (0, 1, 0), 24, ("Z50II-07-004",)),
     "Z50II-07-004": ("Z50II-07-002", "液晶屏盖玻璃", "LCD cover glass", 6, (0, 1, 0), 20, ()),
     "Z50II-07-005": ("Z50II-07-001", "液晶屏内侧铰臂", "Inner LCD hinge arm", 10, (1, 0, 0), 24, ("Z50II-07-007",)),
-    "Z50II-07-006": ("Z50II-07-002", "液晶屏外侧铰臂", "Outer LCD hinge arm", 10, (1, 0, 0), 28, ("Z50II-07-007",)),
-    "Z50II-07-007": ("Z50II-07-001", "液晶屏铰链转轴", "LCD hinge pivot", 9, (0, 0, 1), 20, ("Z50II-07-002",)),
+    "Z50II-07-006": ("Z50II-07-002", "液晶屏外侧铰臂", "Outer LCD hinge arm", 10, (0, 1, 0), 28, ("Z50II-07-007",)),
+    "Z50II-07-007": ("Z50II-07-001", "液晶屏铰链转轴", "LCD hinge pivot", 9, (0, 0, 1), 60, ("Z50II-07-002", "Z50II-08-012", "Z50II-08-014", "Z50II-08-017")),
     "Z50II-07-008": ("Z50II-07-001", "菜单按钮", "MENU button", 3, (0, 1, 0), 16, ()),
     "Z50II-07-009": ("Z50II-07-001", "播放按钮", "Playback button", 3, (0, 1, 0), 16, ()),
     "Z50II-07-010": ("Z50II-07-001", "删除按钮", "Delete button", 3, (0, 1, 0), 16, ()),
@@ -86,7 +87,9 @@ def build_rear_lcd_controls() -> list[bpy.types.Object]:
     hinge_mat = get_material("Z50II LCD Hinge Metal", (0.34, 0.37, 0.40, 1), metallic=0.91, roughness=0.27)
     control_mat = get_material("Z50II Rear Controls", (0.028, 0.032, 0.036, 1), metallic=0.10, roughness=0.39)
 
-    rear_shell = rounded_box("Z50II-07-001_rear_shell", (67.0, 1.65, 3.0), (18.0, 35.0, 31.0), 0.50, collection, shell_mat)
+    # Leave a real upper exit slot above the hinge axis so the service pin can
+    # be withdrawn vertically without crossing the rear-shell top rail.
+    rear_shell = rounded_box("Z50II-07-001_rear_shell", (60.0, 1.65, 3.0), (14.0, 35.0, 31.0), 0.50, collection, shell_mat)
     for suffix, size, location in (
         ("bottom", (105.0, 1.65, 3.0), (0.5, 35.0, -33.0)),
         ("left", (3.0, 1.65, 61.0), (-52.0, 35.0, -1.0)),
@@ -98,7 +101,8 @@ def build_rear_lcd_controls() -> list[bpy.types.Object]:
         ("screen_upper_web", (66.0, 1.65, 2.2), (15.0, 34.4, 23.2)),
         ("screen_lower_web", (66.0, 1.65, 2.2), (15.0, 34.4, -25.2)),
         ("screen_inner_web", (2.2, 1.65, 46.0), (-18.4, 34.4, -1.0)),
-        ("hinge_pocket_web", (2.0, 1.65, 44.0), (49.0, 34.4, -2.0)),
+        ("hinge_pocket_upper_web", (2.0, 1.65, 5.0), (52.5, 34.4, 20.0)),
+        ("hinge_pocket_lower_web", (2.0, 1.65, 5.0), (52.5, 34.4, -24.0)),
         ("control_spine", (3.0, 1.65, 38.0), (-28.0, 34.4, -7.0)),
     ):
         _parent(rounded_box(f"Z50II_rear_shell_{suffix}", size, location, 0.48, collection, shell_mat), rear_shell)
@@ -113,32 +117,44 @@ def build_rear_lcd_controls() -> list[bpy.types.Object]:
     rear_shell["lcdOpeningMm"] = [66.0, 46.0]
     _annotate(rear_shell, "Z50II-07-001", "由周边梁、屏幕开口、铰链口袋和真实按键座组成的中空后壳。", "Hollow rear shell formed from perimeter rails, a screen opening, hinge pocket, and physical button seats.")
 
-    lcd_frame = _frame("Z50II-07-002_lcd_frame", (15.0, 36.0, -1.0), 64.0, 43.0, 1.55, 2.2, collection, frame_mat)
-    _parent(rounded_box("Z50II_lcd_frame_back_plate", (57.2, 0.55, 36.2), (15.0, 35.55, -1.0), 1.0, collection, frame_mat), lcd_frame)
+    lcd_frame = _frame("Z50II-07-002_lcd_frame", (13.0, 36.0, -1.0), 61.5, 43.0, 1.55, 2.2, collection, frame_mat)
+    _parent(rounded_box("Z50II_lcd_frame_back_plate", (55.2, 0.55, 36.2), (13.0, 35.55, -1.0), 1.0, collection, frame_mat), lcd_frame)
     lcd_frame["closedPosition"] = True
     lcd_frame["screenDiagonalInches"] = 3.2
     _annotate(lcd_frame, "Z50II-07-002", "以关闭状态嵌入后壳的3.2英寸级屏幕承载框。", "3.2-inch-class screen carrier seated in the rear shell in its closed position.")
 
-    lcd_panel = rounded_box("Z50II-07-003_lcd_panel", (56.8, 0.46, 35.8), (15.0, 36.62, -1.0), 0.75, collection, panel_mat)
-    _parent(rounded_box("Z50II_lcd_panel_driver", (18.0, 0.55, 2.0), (15.0, 36.12, -18.5), 0.30, collection, control_mat), lcd_panel)
+    lcd_panel = rounded_box("Z50II-07-003_lcd_panel", (56.8, 0.46, 35.8), (13.0, 36.62, -1.0), 0.75, collection, panel_mat)
+    _parent(rounded_box("Z50II_lcd_panel_driver", (18.0, 0.55, 2.0), (13.0, 36.12, -18.5), 0.30, collection, control_mat), lcd_panel)
     lcd_panel["layerIndex"] = 1
     _annotate(lcd_panel, "Z50II-07-003", "与框架和盖玻璃保持独立层间距的触控液晶显示层。", "Touch LCD display layer with explicit spacing from both carrier and cover glass.")
 
-    cover_glass = rounded_box("Z50II-07-004_lcd_cover_glass", (58.0, 0.38, 37.0), (15.0, 37.18, -1.0), 1.05, collection, glass_mat)
+    cover_glass = rounded_box("Z50II-07-004_lcd_cover_glass", (58.0, 0.38, 37.0), (13.0, 37.18, -1.0), 1.05, collection, glass_mat)
     cover_glass["layerIndex"] = 2
     _annotate(cover_glass, "Z50II-07-004", "关闭屏幕最外侧的独立薄型盖玻璃。", "Independent thin cover glass at the outermost face of the closed display.")
 
     pivot_center = (49.6, 35.15, -2.0)
+    screen_pivot = bpy.data.objects.new("Z50II_LCD_SCREEN_PIVOT", None)
+    screen_pivot.empty_display_type = "PLAIN_AXES"
+    screen_pivot.empty_display_size = mm(8.0)
+    screen_pivot.location = tuple(mm(value) for value in pivot_center)
+    screen_pivot["motionGroupId"] = "rear-lcd-screen"
+    screen_pivot["pivotAxis"] = [0.0, 0.0, 1.0]
+    screen_pivot["closedAngleDeg"] = 0.0
+    screen_pivot["openAngleDeg"] = -105.0
+    screen_pivot["purpose"] = "Browser animation pivot for the complete rear LCD screen group"
+    collection.objects.link(screen_pivot)
+
     inner_arm = cylinder("Z50II-07-005_inner_hinge_arm", 3.0, 5.0, pivot_center, (0, 0, 0), collection, hinge_mat, vertices=40)
     _parent(rounded_box("Z50II_inner_hinge_arm_web", (2.4, 1.5, 31.0), (48.0, 34.75, -2.0), 0.55, collection, hinge_mat), inner_arm)
     _parent(rounded_box("Z50II_inner_hinge_arm_body_land", (7.0, 2.0, 4.0), (46.0, 34.3, -17.0), 0.75, collection, hinge_mat), inner_arm)
     inner_arm["pivotOriginMm"] = list(pivot_center)
     inner_arm["pivotAxis"] = [0.0, 0.0, 1.0]
+    inner_arm["kinematicRole"] = "stationary"
     _annotate(inner_arm, "Z50II-07-005", "由机身侧轴套、竖向连杆和下端安装面构成的内侧铰臂。", "Inner hinge arm with body-side hub, vertical link, and lower mounting land.")
 
-    outer_arm = cylinder("Z50II-07-006_outer_hinge_arm", 3.7, 3.2, pivot_center, (0, 0, 0), collection, hinge_mat, vertices=40)
-    _parent(rounded_box("Z50II_outer_hinge_arm_web", (2.0, 1.3, 30.0), (51.1, 35.65, -2.0), 0.50, collection, hinge_mat), outer_arm)
-    _parent(rounded_box("Z50II_outer_hinge_arm_screen_land", (7.0, 1.8, 4.0), (47.5, 35.8, 18.0), 0.70, collection, hinge_mat), outer_arm)
+    outer_arm = cylinder("Z50II-07-006_outer_hinge_arm", 1.65, 3.2, pivot_center, (0, 0, 0), collection, hinge_mat, vertices=40)
+    _parent(rounded_box("Z50II_outer_hinge_arm_web", (1.8, 1.3, 30.0), (46.0, 36.2, -2.0), 0.50, collection, hinge_mat), outer_arm)
+    _parent(rounded_box("Z50II_outer_hinge_arm_screen_land", (5.5, 1.6, 4.0), (44.5, 36.4, 18.0), 0.65, collection, hinge_mat), outer_arm)
     outer_arm["pivotOriginMm"] = list(pivot_center)
     outer_arm["pivotAxis"] = [0.0, 0.0, 1.0]
     _annotate(outer_arm, "Z50II-07-006", "连接关闭屏幕框的外侧铰臂，与内臂共享动画转轴原点。", "Outer hinge arm connecting the closed screen frame and sharing the animation pivot with the inner arm.")
@@ -148,7 +164,19 @@ def build_rear_lcd_controls() -> list[bpy.types.Object]:
     hinge_pivot["pivotAxis"] = [0.0, 0.0, 1.0]
     hinge_pivot["closedAngleDeg"] = 0.0
     hinge_pivot["openAngleDeg"] = -105.0
+    hinge_pivot["motionGroupId"] = "rear-lcd-screen"
+    hinge_pivot["kinematicRole"] = "axis"
     _annotate(hinge_pivot, "Z50II-07-007", "贯穿两支铰臂的竖直金属转轴，为后续开屏动画提供同轴基准。", "Vertical metal pivot through both hinge arms, providing the coaxial basis for a later open-screen animation.")
+
+    for moving in (lcd_frame, lcd_panel, cover_glass, outer_arm):
+        moving["pivotObject"] = screen_pivot.name
+        moving["pivotOriginMm"] = list(pivot_center)
+        moving["pivotAxis"] = [0.0, 0.0, 1.0]
+        moving["motionGroupId"] = "rear-lcd-screen"
+        moving["kinematicRole"] = "moving"
+        moving["closedAngleDeg"] = 0.0
+        moving["openAngleDeg"] = -105.0
+        _parent(moving, screen_pivot)
 
     menu = cylinder("Z50II-07-008_menu_button", 2.0, 1.2, (-39.0, 36.25, 18.0), (90, 0, 0), collection, control_mat, vertices=40)
     menu["seatObject"] = "Z50II_rear_menu_seat"

@@ -35,7 +35,11 @@ def attach_part_metadata(
 
     obj["partId"] = part_id
     obj["moduleId"] = module_id
-    obj["parentId"] = parent_id
+    if parent_id is None:
+        if "parentId" in obj:
+            del obj["parentId"]
+    else:
+        obj["parentId"] = parent_id
     obj["nameZh"] = name_zh
     obj["nameEn"] = name_en
     obj["descriptionZh"] = description_zh

@@ -59,29 +59,31 @@ def _ring_width_mm(obj: bpy.types.Object, z_mm: float, tolerance_mm: float = 0.0
 
 
 def _maximum_profile_turn_degrees(obj: bpy.types.Object, y_mm: float) -> float:
-    """Measure angular faceting along the upper X/Z silhouette at a Y station."""
-    candidates = []
-    for vertex in obj.data.vertices:
-        point = obj.matrix_world @ vertex.co
-        if abs(point.y * 1000.0 - y_mm) <= 0.20 and point.z * 1000.0 >= 39.0:
-            candidates.append((point.x * 1000.0, point.z * 1000.0))
-    points = sorted({(round(x, 3), round(z, 3)) for x, z in candidates})
-    clusters = []
-    for point in points:
-        if not clusters or point[0] - clusters[-1][-1][0] > 0.75:
-            clusters.append([point])
-        else:
-            clusters[-1].append(point)
-    envelope = [
-        (sum(point[0] for point in cluster) / len(cluster), max(point[1] for point in cluster))
-        for cluster in clusters
-    ]
+    """Measure the evaluated outer crown without sampling the hollow liner."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated = obj.evaluated_get(depsgraph)
+    inverse = evaluated.matrix_world.inverted()
+    minimum, maximum = _world_bounds(obj)
+    spacing = 0.0005
+    sample_count = int((maximum.x - minimum.x) / spacing) + 1
     upper = []
-    for x, z in envelope:
-        if not upper or z > upper[-1][1] - 2.0:
-            upper.append((x, z))
+    for index in range(sample_count + 1):
+        x = minimum.x + (maximum.x - minimum.x) * index / sample_count
+        origin_world = Vector((x, (y_mm + 0.75) / 1000.0, maximum.z + 0.005))
+        direction_world = Vector((0.0, 0.0, -1.0))
+        hit, location, _normal, _face = evaluated.ray_cast(
+            inverse @ origin_world,
+            (inverse.to_3x3() @ direction_world).normalized(),
+        )
+        if hit:
+            point = evaluated.matrix_world @ location
+            if point.z * 1000.0 >= 39.0:
+                upper.append((point.x * 1000.0, point.z * 1000.0))
     turns = []
-    for first, middle, last in zip(upper, upper[1:], upper[2:]):
+    # A 2 mm baseline measures visible faceting rather than sub-millimetre
+    # bevel tessellation at the open arch boundary.
+    for index in range(2, len(upper) - 2):
+        first, middle, last = upper[index - 2], upper[index], upper[index + 2]
         incoming = Vector((middle[0] - first[0], middle[1] - first[1]))
         outgoing = Vector((last[0] - middle[0], last[1] - middle[1]))
         if incoming.length > 0.05 and outgoing.length > 0.05:
@@ -188,6 +190,8 @@ assert all(polygon.use_smooth for polygon in front_shell.data.polygons), "body s
 evf_housing = bpy.data.objects["Z50II_evf_housing"]
 assert len(evf_housing.data.vertices) >= 30, "EVF loft needs more profile stations"
 assert all(polygon.use_smooth for polygon in evf_housing.data.polygons), "EVF shell is not smooth shaded"
+assert evf_housing.get("hollowArch") is True
+assert abs(evf_housing.get("wallThicknessMm", 0.0) - 1.7) < 1.0e-6
 
 palm_width_mm = _ring_width_mm(grip_rubber, 4.0)
 neck_width_mm = _ring_width_mm(grip_rubber, 30.0)
@@ -227,7 +231,7 @@ assert display_pocket is not None and display_pocket.parent == front_shell, (
 assert not _ray_hits(front_shell, (0.060, 0.030, -0.004), (-1.0, 0.0, 0.0), 13.0), (
     "rear display-hinge pocket does not pass through the shell edge"
 )
-assert _ray_hits(front_shell, (0.060, 0.030, 0.014), (-1.0, 0.0, 0.0), 13.0), (
+assert _ray_hits(front_shell, (0.060, 0.030, 0.022), (-1.0, 0.0, 0.0), 13.0), (
     "display-hinge pocket probe lacks adjacent shell material"
 )
 battery_reveal = bpy.data.objects.get("Z50II_battery_bay_reveal")

@@ -1,11 +1,24 @@
 """Assert the complete eight-module, 100-part Z50II catalog."""
 
+from pathlib import Path
+import sys
+
 import bpy
 from itertools import combinations
 from math import ceil, radians
 from math import isfinite
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
+
+
+BLENDER_ROOT = Path(__file__).resolve().parents[1]
+if str(BLENDER_ROOT) not in sys.path:
+    sys.path.insert(0, str(BLENDER_ROOT))
+TESTS_ROOT = Path(__file__).resolve().parent
+if str(TESTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TESTS_ROOT))
+
+from root_contact_contract import TASK7_ROOT_CONTACTS
 
 
 EXPECTED_COUNTS = {
@@ -22,24 +35,24 @@ EXPECTED_COUNTS = {
 EXPECTED_CONTROL_PARTS = {
     "06_evf_top_flash": {
         "Z50II-06-001": ("Z50II-06-001_evf_housing", "电子取景器内壳", "EVF housing", 17, (0.0, 1.0, 0.0), 32.0, ("Z50II-02-003", "Z50II-06-003", "Z50II-06-004")),
-        "Z50II-06-002": ("Z50II-06-002_evf_display", "电子取景器显示屏", "EVF display", 18, (0.0, 1.0, 0.0), 25.0, ("Z50II-06-001",)),
+        "Z50II-06-002": ("Z50II-06-002_evf_display", "电子取景器显示屏", "EVF display", 18, (0.0, -1.0, 0.0), 25.0, ("Z50II-06-001",)),
         "Z50II-06-003": ("Z50II-06-003_evf_eyepiece_lens", "电子取景器目镜", "EVF eyepiece lens", 5, (0.0, 1.0, 0.0), 18.0, ()),
         "Z50II-06-004": ("Z50II-06-004_diopter_wheel", "屈光度调节轮", "Diopter wheel", 5, (1.0, 0.0, 0.0), 16.0, ()),
         "Z50II-06-005": ("Z50II-06-005_hot_shoe_rails", "热靴导轨", "Hot-shoe rails", 4, (0.0, 0.0, 1.0), 18.0, ()),
         "Z50II-06-006": ("Z50II-06-006_hot_shoe_contact_plate", "热靴触点板", "Hot-shoe contact plate", 5, (0.0, 0.0, 1.0), 16.0, ("Z50II-06-005",)),
         "Z50II-06-007": ("Z50II-06-007_flash_outer_head", "内置闪光灯灯头外壳", "Flash outer head", 5, (0.0, 0.0, 1.0), 32.0, ("Z50II-06-008",)),
         "Z50II-06-008": ("Z50II-06-008_flash_reflector", "闪光灯反光杯", "Flash reflector", 4, (0.0, -1.0, 0.0), 18.0, ()),
-        "Z50II-06-009": ("Z50II-06-009_flash_hinge", "闪光灯铰链", "Flash hinge", 6, (1.0, 0.0, 0.0), 24.0, ("Z50II-06-007",)),
-        "Z50II-06-010": ("Z50II-06-010_top_control_pcb", "顶部控制电路板", "Top-control PCB", 22, (0.0, 1.0, 0.0), 26.0, ("Z50II-02-003", "Z50II-08-007")),
+        "Z50II-06-009": ("Z50II-06-009_flash_hinge", "闪光灯铰链", "Flash hinge", 6, (0.0, 0.0, 1.0), 24.0, ("Z50II-06-007",)),
+        "Z50II-06-010": ("Z50II-06-010_top_control_pcb", "顶部控制电路板", "Top-control PCB", 22, (0.0, 0.0, 1.0), 26.0, ("Z50II-02-003", "Z50II-08-007")),
     },
     "07_rear_lcd_controls": {
-        "Z50II-07-001": ("Z50II-07-001_rear_shell", "后壳", "Rear shell", 11, (0.0, 1.0, 0.0), 45.0, ("Z50II-07-005", "Z50II-07-006", "Z50II-07-008", "Z50II-07-009", "Z50II-07-010", "Z50II-07-011", "Z50II-07-012", "Z50II-08-013", "Z50II-08-014")),
+        "Z50II-07-001": ("Z50II-07-001_rear_shell", "后壳", "Rear shell", 11, (0.0, 1.0, 0.0), 45.0, ("Z50II-07-005", "Z50II-07-006", "Z50II-07-008", "Z50II-07-009", "Z50II-07-010", "Z50II-07-011", "Z50II-07-012", "Z50II-08-013", "Z50II-08-014", "Z50II-08-017")),
         "Z50II-07-002": ("Z50II-07-002_lcd_frame", "液晶屏框架", "LCD frame", 8, (0.0, 1.0, 0.0), 28.0, ("Z50II-07-003",)),
         "Z50II-07-003": ("Z50II-07-003_lcd_panel", "液晶显示面板", "LCD panel", 7, (0.0, 1.0, 0.0), 24.0, ("Z50II-07-004",)),
         "Z50II-07-004": ("Z50II-07-004_lcd_cover_glass", "液晶屏盖玻璃", "LCD cover glass", 6, (0.0, 1.0, 0.0), 20.0, ()),
         "Z50II-07-005": ("Z50II-07-005_inner_hinge_arm", "液晶屏内侧铰臂", "Inner LCD hinge arm", 10, (1.0, 0.0, 0.0), 24.0, ("Z50II-07-007",)),
-        "Z50II-07-006": ("Z50II-07-006_outer_hinge_arm", "液晶屏外侧铰臂", "Outer LCD hinge arm", 10, (1.0, 0.0, 0.0), 28.0, ("Z50II-07-007",)),
-        "Z50II-07-007": ("Z50II-07-007_hinge_pivot", "液晶屏铰链转轴", "LCD hinge pivot", 9, (0.0, 0.0, 1.0), 20.0, ("Z50II-07-002",)),
+        "Z50II-07-006": ("Z50II-07-006_outer_hinge_arm", "液晶屏外侧铰臂", "Outer LCD hinge arm", 10, (0.0, 1.0, 0.0), 28.0, ("Z50II-07-007",)),
+        "Z50II-07-007": ("Z50II-07-007_hinge_pivot", "液晶屏铰链转轴", "LCD hinge pivot", 9, (0.0, 0.0, 1.0), 60.0, ("Z50II-07-002", "Z50II-08-012", "Z50II-08-014", "Z50II-08-017")),
         "Z50II-07-008": ("Z50II-07-008_menu_button", "菜单按钮", "MENU button", 3, (0.0, 1.0, 0.0), 16.0, ()),
         "Z50II-07-009": ("Z50II-07-009_playback_button", "播放按钮", "Playback button", 3, (0.0, 1.0, 0.0), 16.0, ()),
         "Z50II-07-010": ("Z50II-07-010_delete_button", "删除按钮", "Delete button", 3, (0.0, 1.0, 0.0), 16.0, ()),
@@ -53,10 +66,10 @@ EXPECTED_CONTROL_PARTS = {
         "Z50II-08-004": ("Z50II-08-004_output_remote_jack", "3.5毫米输出／遥控接口", "3.5 mm output/remote jack", 21, (1.0, 0.0, 0.0), 22.0, ("Z50II-02-005", "Z50II-02-009", "Z50II-08-010")),
         "Z50II-08-005": ("Z50II-08-005_io_daughterboard", "接口子板", "I/O daughterboard", 22, (1.0, 0.0, 0.0), 30.0, ("Z50II-08-001", "Z50II-08-002", "Z50II-08-003", "Z50II-08-004", "Z50II-08-010")),
         "Z50II-08-006": ("Z50II-08-006_wifi_bluetooth_antenna", "Wi-Fi／Bluetooth天线", "Wi-Fi/Bluetooth antenna", 20, (0.0, 1.0, 0.0), 22.0, ("Z50II-07-001", "Z50II-08-008")),
-        "Z50II-08-007": ("Z50II-08-007_top_flex_cable", "顶部控制排线", "Top-control flex cable", 19, (0.0, 1.0, 0.0), 24.0, ("Z50II-02-003", "Z50II-08-018")),
+        "Z50II-08-007": ("Z50II-08-007_top_flex_cable", "顶部控制排线", "Top-control flex cable", 19, (0.0, 1.0, 0.0), 24.0, ("Z50II-02-001", "Z50II-02-003", "Z50II-08-018")),
         "Z50II-08-008": ("Z50II-08-008_rear_flex_cable", "后部控制排线", "Rear-control flex cable", 19, (0.0, 1.0, 0.0), 24.0, ("Z50II-07-001", "Z50II-08-018")),
         "Z50II-08-009": ("Z50II-08-009_sensor_flex_cable", "传感器排线", "Sensor flex cable", 19, (0.0, 1.0, 0.0), 26.0, ("Z50II-02-001", "Z50II-07-001", "Z50II-08-018")),
-        "Z50II-08-010": ("Z50II-08-010_port_flex_cable", "接口板排线", "Port flex cable", 19, (1.0, 0.0, 0.0), 24.0, ("Z50II-02-005", "Z50II-08-018")),
+        "Z50II-08-010": ("Z50II-08-010_port_flex_cable", "接口板排线", "Port flex cable", 19, (1.0, 0.0, 0.0), 24.0, ("Z50II-02-001", "Z50II-02-005", "Z50II-08-018")),
         "Z50II-08-011": ("Z50II-08-011_upper_left_screw", "左上机壳螺钉", "Upper-left shell screw", 1, (0.0, 1.0, 0.0), 18.0, ()),
         "Z50II-08-012": ("Z50II-08-012_upper_right_screw", "右上机壳螺钉", "Upper-right shell screw", 1, (0.0, 1.0, 0.0), 18.0, ()),
         "Z50II-08-013": ("Z50II-08-013_rear_left_screw", "左后机壳螺钉", "Rear-left shell screw", 1, (0.0, 1.0, 0.0), 20.0, ()),
@@ -64,7 +77,7 @@ EXPECTED_CONTROL_PARTS = {
         "Z50II-08-015": ("Z50II-08-015_bottom_left_screw", "左下机壳螺钉", "Bottom-left shell screw", 1, (0.0, 0.0, -1.0), 18.0, ()),
         "Z50II-08-016": ("Z50II-08-016_bottom_right_screw", "右下机壳螺钉", "Bottom-right shell screw", 1, (0.0, 0.0, -1.0), 18.0, ()),
         "Z50II-08-017": ("Z50II-08-017_washer_set", "机壳垫圈组", "Shell washer set", 2, (0.0, 1.0, 0.0), 16.0, ("Z50II-08-011", "Z50II-08-012", "Z50II-08-013", "Z50II-08-014", "Z50II-08-015", "Z50II-08-016")),
-        "Z50II-08-018": ("Z50II-08-018_cable_clamp", "排线压板", "Cable clamp", 18, (0.0, 1.0, 0.0), 18.0, ("Z50II-02-005", "Z50II-07-001")),
+        "Z50II-08-018": ("Z50II-08-018_cable_clamp", "排线压板", "Cable clamp", 18, (-1.0, 0.0, 0.0), 18.0, ("Z50II-02-005", "Z50II-07-001")),
     },
 }
 
@@ -77,6 +90,10 @@ part_ids = [obj["partId"] for obj in bpy.data.objects if obj.get("partId")]
 assert len(part_ids) == len(set(part_ids)) == 100
 
 parts = {obj["partId"]: obj for obj in bpy.data.objects if obj.get("partId")}
+for part_id, obj in parts.items():
+    parent_id = obj.get("parentId")
+    assert parent_id != "", part_id
+    assert parent_id is None or parent_id in parts, (part_id, parent_id)
 expected_control_ids = set().union(*(set(entries) for entries in EXPECTED_CONTROL_PARTS.values()))
 actual_control_ids = {
     part_id for part_id in parts if part_id.startswith(("Z50II-06-", "Z50II-07-", "Z50II-08-"))
@@ -100,7 +117,9 @@ for module_id, records in EXPECTED_CONTROL_PARTS.items():
 assert {obj["step"] for obj in parts.values()} == set(range(1, 41))
 for part_id, obj in parts.items():
     axis = Vector(obj["explodeAxis"])
-    assert abs(axis.length - 1.0) < 1.0e-9
+    # mathutils.Vector stores values at Blender's single-precision boundary;
+    # normalized diagonal axes therefore round by about 3e-8.
+    assert abs(axis.length - 1.0) < 1.0e-6
     assert obj["explodeDistance"] > 0.0
     determinant = obj.matrix_world.determinant()
     assert isfinite(determinant) and determinant > 1.0e-9, (part_id, determinant)
@@ -136,6 +155,26 @@ assert max((origin - lcd_origins[0]).length for origin in lcd_origins[1:]) < 1.0
 assert all(tuple(obj["pivotAxis"]) == (0.0, 0.0, 1.0) for obj in lcd_hinge_parts)
 assert all((obj.matrix_world.translation * 1000.0 - lcd_origins[0]).length < 1.0e-5 for obj in lcd_hinge_parts)
 assert parts["Z50II-07-007"]["openAngleDeg"] == -105.0
+
+lcd_pivot_node = bpy.data.objects.get("Z50II_LCD_SCREEN_PIVOT")
+assert lcd_pivot_node is not None and lcd_pivot_node.type == "EMPTY"
+assert lcd_pivot_node.get("partId") is None
+assert lcd_pivot_node.get("motionGroupId") == "rear-lcd-screen"
+moving_lcd_ids = {
+    "Z50II-07-002",
+    "Z50II-07-003",
+    "Z50II-07-004",
+    "Z50II-07-006",
+}
+for part_id in moving_lcd_ids:
+    moving = parts[part_id]
+    assert moving.parent == lcd_pivot_node, part_id
+    assert moving["pivotObject"] == lcd_pivot_node.name
+    assert moving["motionGroupId"] == "rear-lcd-screen"
+    assert moving["kinematicRole"] == "moving"
+assert parts["Z50II-07-005"].parent != lcd_pivot_node
+assert parts["Z50II-07-005"]["kinematicRole"] == "stationary"
+assert parts["Z50II-07-007"]["kinematicRole"] == "axis"
 
 flash_head = parts["Z50II-06-007"]
 flash_hinge = parts["Z50II-06-009"]
@@ -262,68 +301,57 @@ def roots_overlap(first, second):
     return bool(transformed_root_bvh(first).overlap(transformed_root_bvh(second)))
 
 
-# Complete BVH coverage for every new/new and new/retained selectable-root pair.
-# Only physical insertions or coaxial joints may appear in this explicit list.
-ALLOWED_ROOT_CONTACTS = {
-    frozenset(("Z50II-06-001", "Z50II-06-002")),
-    frozenset(("Z50II-06-001", "Z50II-06-004")),
-    frozenset(("Z50II-06-005", "Z50II-06-006")),
-    frozenset(("Z50II-06-007", "Z50II-06-008")),
-    frozenset(("Z50II-06-007", "Z50II-06-009")),
-    frozenset(("Z50II-08-001", "Z50II-08-005")),
-    frozenset(("Z50II-08-002", "Z50II-08-005")),
-    frozenset(("Z50II-08-003", "Z50II-08-005")),
-    frozenset(("Z50II-08-004", "Z50II-08-005")),
-    frozenset(("Z50II-07-001", "Z50II-07-002")),
-    frozenset(("Z50II-07-001", "Z50II-07-005")),
-    frozenset(("Z50II-07-001", "Z50II-07-006")),
-    frozenset(("Z50II-07-001", "Z50II-07-007")),
-    frozenset(("Z50II-07-001", "Z50II-07-008")),
-    frozenset(("Z50II-07-001", "Z50II-07-009")),
-    frozenset(("Z50II-07-001", "Z50II-07-010")),
-    frozenset(("Z50II-07-001", "Z50II-07-011")),
-    frozenset(("Z50II-07-002", "Z50II-07-006")),
-    frozenset(("Z50II-07-002", "Z50II-07-005")),
-    frozenset(("Z50II-07-005", "Z50II-07-006")),
-    frozenset(("Z50II-07-005", "Z50II-07-007")),
-    frozenset(("Z50II-07-006", "Z50II-07-007")),
-    *(
-        frozenset((f"Z50II-08-{screw_index:03d}", "Z50II-08-017"))
-        for screw_index in range(11, 17)
-    ),
-    *(frozenset((f"Z50II-08-{flex_index:03d}", "Z50II-08-018")) for flex_index in range(7, 11)),
-    frozenset(("Z50II-02-003", "Z50II-06-005")),
-    frozenset(("Z50II-02-003", "Z50II-06-006")),
-    frozenset(("Z50II-02-003", "Z50II-06-007")),
-    # The optical tunnel, rear eyepiece and diopter are captured by the EVF
-    # shell lips.
-    frozenset(("Z50II-02-003", "Z50II-06-001")),
-    frozenset(("Z50II-02-003", "Z50II-06-003")),
-    frozenset(("Z50II-02-003", "Z50II-06-004")),
-    frozenset(("Z50II-02-003", "Z50II-06-009")),
-    frozenset(("Z50II-02-001", "Z50II-07-001")),
-    frozenset(("Z50II-02-003", "Z50II-07-001")),
-    frozenset(("Z50II-02-001", "Z50II-07-005")),
-    frozenset(("Z50II-02-001", "Z50II-07-006")),
-    frozenset(("Z50II-02-004", "Z50II-08-015")),
-    frozenset(("Z50II-02-004", "Z50II-08-016")),
-    frozenset(("Z50II-03-011", "Z50II-08-009")),
-    frozenset(("Z50II-04-012", "Z50II-08-007")),
-    frozenset(("Z50II-04-012", "Z50II-08-008")),
-    frozenset(("Z50II-04-012", "Z50II-08-009")),
-    frozenset(("Z50II-04-012", "Z50II-08-010")),
-    frozenset(("Z50II-06-010", "Z50II-08-007")),
-    frozenset(("Z50II-07-001", "Z50II-08-006")),
-    frozenset(("Z50II-07-001", "Z50II-08-017")),
-    frozenset(("Z50II-08-005", "Z50II-08-010")),
-    frozenset(("Z50II-02-001", "Z50II-08-014")),
-    frozenset(("Z50II-02-003", "Z50II-08-017")),
-    frozenset(("Z50II-02-003", "Z50II-08-011")),
-    frozenset(("Z50II-02-003", "Z50II-08-012")),
-    frozenset(("Z50II-02-001", "Z50II-06-010")),
-    frozenset(("Z50II-02-001", "Z50II-08-007")),
-    frozenset(("Z50II-02-003", "Z50II-08-007")),
+def point_to_root_bounds_distance_mm(root, point_mm):
+    _vertices, _polygons, minimum, maximum = root_geometry(root)
+    point = Vector(point_mm) / 1000.0
+    nearest = Vector(
+        tuple(max(minimum[axis], min(maximum[axis], point[axis])) for axis in range(3))
+    )
+    return (nearest - point).length * 1000.0
+
+
+# The final handedness reflection places the +X-removing side cover beside the
+# +X screw seats.  Dependency IDs must follow evaluated world geometry, not the
+# pre-reflection modelling side.
+cover_fasteners = {
+    "Z50II-02-005": ("Z50II-08-012", "Z50II-08-014"),
+    "Z50II-02-006": ("Z50II-08-011", "Z50II-08-013"),
 }
+for cover_id, expected_screws in cover_fasteners.items():
+    dependencies = set(parts[cover_id]["dependsOn"])
+    assert set(expected_screws) <= dependencies, (cover_id, dependencies)
+    selected_distances = [
+        point_to_root_bounds_distance_mm(parts[cover_id], parts[screw_id]["seatCenterMm"])
+        for screw_id in expected_screws
+    ]
+    opposite_screws = tuple(
+        screw_id
+        for screw_id in ("Z50II-08-011", "Z50II-08-012", "Z50II-08-013", "Z50II-08-014")
+        if screw_id not in expected_screws
+    )
+    opposite_distances = [
+        point_to_root_bounds_distance_mm(parts[cover_id], parts[screw_id]["seatCenterMm"])
+        for screw_id in opposite_screws
+    ]
+    assert max(selected_distances) < min(opposite_distances), (
+        cover_id,
+        selected_distances,
+        opposite_distances,
+    )
+
+
+# Complete BVH coverage for every new/new and new/retained selectable-root pair.
+# Every exception is both observed below and documented in the shared contract.
+ALLOWED_ROOT_CONTACTS = TASK7_ROOT_CONTACTS
+
+unobserved_allowed_contacts = sorted(
+    tuple(sorted(pair))
+    for pair in ALLOWED_ROOT_CONTACTS
+    if not roots_overlap(*(parts[part_id] for part_id in sorted(pair)))
+)
+assert not unobserved_allowed_contacts, (
+    f"pre-emptive root-contact exceptions: {unobserved_allowed_contacts}"
+)
 
 new_ids = sorted(expected_control_ids)
 retained_ids = sorted(set(parts) - set(new_ids))
@@ -340,14 +368,34 @@ for first_id, second_id in checked_pairs:
         unexpected_intersections[(first_id, second_id)] = True
 assert not unexpected_intersections, f"Task-7 selectable-root interpenetration: {sorted(unexpected_intersections)}"
 
-# Sample the physical open sweeps around the stored origins. The screen swings
-# rearward around Z; the flash lifts around X and then has a clear +Z path.
+# Sample the physical open sweeps around the stored origins. The complete LCD
+# motion group swings rearward around Z; only its coaxial hinge interfaces may
+# stay in contact with stationary roots.
 lcd_pivot_m = Vector(parts["Z50II-07-007"]["pivotOriginMm"]) / 1000.0
 assert parts["Z50II-07-007"]["openAngleDeg"] == -105.0
-front_shell_bvh = transformed_root_bvh(parts["Z50II-02-001"])
+stationary_lcd_ids = sorted(set(parts) - moving_lcd_ids)
+stationary_lcd_bvhs = {
+    part_id: transformed_root_bvh(parts[part_id]) for part_id in stationary_lcd_ids
+}
+allowed_lcd_sweep_contacts = {
+    frozenset(("Z50II-07-005", "Z50II-07-006")),
+    frozenset(("Z50II-07-006", "Z50II-07-007")),
+}
+lcd_sweep_failures = {}
 for angle in (-15, -30, -45, -60, -75, -90, -105):
     transform = Matrix.Translation(lcd_pivot_m) @ Matrix.Rotation(radians(angle), 4, "Z") @ Matrix.Translation(-lcd_pivot_m)
-    assert not transformed_root_bvh(lcd_frame, transform).overlap(front_shell_bvh), angle
+    overlaps = []
+    for moving_id in sorted(moving_lcd_ids):
+        moving_tree = transformed_root_bvh(parts[moving_id], transform)
+        for stationary_id in stationary_lcd_ids:
+            pair = frozenset((moving_id, stationary_id))
+            if pair in allowed_lcd_sweep_contacts:
+                continue
+            if moving_tree.overlap(stationary_lcd_bvhs[stationary_id]):
+                overlaps.append((moving_id, stationary_id))
+    if overlaps:
+        lcd_sweep_failures[angle] = overlaps
+assert not lcd_sweep_failures, lcd_sweep_failures
 
 flash_pivot_m = Vector(flash_head["pivotOriginMm"]) / 1000.0
 top_shell_bvh = transformed_root_bvh(parts["Z50II-02-003"])

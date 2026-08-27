@@ -42,7 +42,6 @@ EXPECTED = set().union(*EXPECTED_BY_MODULE.values())
 REQUIRED_METADATA = {
     "partId",
     "moduleId",
-    "parentId",
     "nameZh",
     "nameEn",
     "descriptionZh",
@@ -75,6 +74,9 @@ for module_id, expected_ids in EXPECTED_BY_MODULE.items():
         obj = parts[part_id]
         absent_metadata = REQUIRED_METADATA - set(obj.keys())
         assert not absent_metadata, f"{part_id} missing metadata: {sorted(absent_metadata)}"
+        parent_id = obj.get("parentId")
+        assert parent_id != "", f"{part_id} uses the obsolete empty parent sentinel"
+        assert parent_id is None or parent_id in all_parts, (part_id, parent_id)
         assert obj["moduleId"] == module_id, (
             f"{part_id} expected module {module_id}, got {obj['moduleId']}"
         )
