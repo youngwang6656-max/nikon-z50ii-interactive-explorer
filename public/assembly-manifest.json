@@ -1,0 +1,2595 @@
+{
+  "schemaVersion": 1,
+  "product": {
+    "name": "Nikon Z50II",
+    "disclaimerZh": "内部结构为参考性重建，非 Nikon 制造商原始 CAD 数据。",
+    "disclaimerEn": "Internal structures are reference reconstruction and not Nikon manufacturer CAD."
+  },
+  "modules": [
+    {
+      "moduleId": "01_chassis_front",
+      "nameZh": "承力骨架与前部结构",
+      "nameEn": "Chassis and front structure",
+      "urls": {
+        "high": "assets/models/high/01_chassis_front.glb",
+        "low": "assets/models/low/01_chassis_front.glb"
+      },
+      "preload": true
+    },
+    {
+      "moduleId": "02_outer_shell_controls",
+      "nameZh": "外壳与外部操作件",
+      "nameEn": "Outer shell and external controls",
+      "urls": {
+        "high": "assets/models/high/02_outer_shell_controls.glb",
+        "low": "assets/models/low/02_outer_shell_controls.glb"
+      },
+      "preload": true
+    },
+    {
+      "moduleId": "03_mount_shutter_sensor",
+      "nameZh": "卡口、快门与传感器",
+      "nameEn": "Mount, shutter, and sensor",
+      "urls": {
+        "high": "assets/models/high/03_mount_shutter_sensor.glb",
+        "low": "assets/models/low/03_mount_shutter_sensor.glb"
+      },
+      "preload": false
+    },
+    {
+      "moduleId": "04_mainboard_thermal",
+      "nameZh": "主板与散热系统",
+      "nameEn": "Mainboard and thermal system",
+      "urls": {
+        "high": "assets/models/high/04_mainboard_thermal.glb",
+        "low": "assets/models/low/04_mainboard_thermal.glb"
+      },
+      "preload": false
+    },
+    {
+      "moduleId": "05_power_storage",
+      "nameZh": "供电与存储",
+      "nameEn": "Power and storage",
+      "urls": {
+        "high": "assets/models/high/05_power_storage.glb",
+        "low": "assets/models/low/05_power_storage.glb"
+      },
+      "preload": false
+    },
+    {
+      "moduleId": "06_evf_top_flash",
+      "nameZh": "电子取景器与顶部闪光灯",
+      "nameEn": "EVF and top flash",
+      "urls": {
+        "high": "assets/models/high/06_evf_top_flash.glb",
+        "low": "assets/models/low/06_evf_top_flash.glb"
+      },
+      "preload": false
+    },
+    {
+      "moduleId": "07_rear_lcd_controls",
+      "nameZh": "后部显示屏与操作件",
+      "nameEn": "Rear LCD and controls",
+      "urls": {
+        "high": "assets/models/high/07_rear_lcd_controls.glb",
+        "low": "assets/models/low/07_rear_lcd_controls.glb"
+      },
+      "preload": false
+    },
+    {
+      "moduleId": "08_io_flex_fasteners",
+      "nameZh": "接口、排线与紧固件",
+      "nameEn": "I/O, flex cables, and fasteners",
+      "urls": {
+        "high": "assets/models/high/08_io_flex_fasteners.glb",
+        "low": "assets/models/low/08_io_flex_fasteners.glb"
+      },
+      "preload": false
+    }
+  ],
+  "parts": [
+    {
+      "partId": "Z50II-08-011",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-02-003",
+      "nameZh": "左上机壳螺钉",
+      "nameEn": "Upper-left shell screw",
+      "descriptionZh": "具有圆柱头和十字槽的机壳紧固件；六枚螺钉共享同一网格数据。",
+      "descriptionEn": "Shell fastener with cylindrical head and cross recess; all six screws share one mesh datablock.",
+      "step": 1,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-012",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-02-003",
+      "nameZh": "右上机壳螺钉",
+      "nameEn": "Upper-right shell screw",
+      "descriptionZh": "与同组紧固件链接网格、但保留独立选择ID和装配座标的机壳螺钉。",
+      "descriptionEn": "Shell screw linked to the shared fastener mesh while retaining its own selectable ID and seat coordinate.",
+      "step": 1,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-013",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-07-001",
+      "nameZh": "左后机壳螺钉",
+      "nameEn": "Rear-left shell screw",
+      "descriptionZh": "与同组紧固件链接网格、但保留独立选择ID和装配座标的机壳螺钉。",
+      "descriptionEn": "Shell screw linked to the shared fastener mesh while retaining its own selectable ID and seat coordinate.",
+      "step": 1,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.02,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-014",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-07-001",
+      "nameZh": "右后机壳螺钉",
+      "nameEn": "Rear-right shell screw",
+      "descriptionZh": "与同组紧固件链接网格、但保留独立选择ID和装配座标的机壳螺钉。",
+      "descriptionEn": "Shell screw linked to the shared fastener mesh while retaining its own selectable ID and seat coordinate.",
+      "step": 1,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.02,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-015",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-02-004",
+      "nameZh": "左下机壳螺钉",
+      "nameEn": "Bottom-left shell screw",
+      "descriptionZh": "与同组紧固件链接网格、但保留独立选择ID和装配座标的机壳螺钉。",
+      "descriptionEn": "Shell screw linked to the shared fastener mesh while retaining its own selectable ID and seat coordinate.",
+      "step": 1,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-016",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-02-004",
+      "nameZh": "右下机壳螺钉",
+      "nameEn": "Bottom-right shell screw",
+      "descriptionZh": "与同组紧固件链接网格、但保留独立选择ID和装配座标的机壳螺钉。",
+      "descriptionEn": "Shell screw linked to the shared fastener mesh while retaining its own selectable ID and seat coordinate.",
+      "step": 1,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-007",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-004",
+      "nameZh": "电池舱门",
+      "nameEn": "Battery door",
+      "descriptionZh": "嵌入底壳止口并具有铰轴和锁扣缺口的参考舱门。",
+      "descriptionEn": "Inset reference battery door with hinge barrel and latch notch.",
+      "step": 2,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-008",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-005",
+      "nameZh": "上接口舱门",
+      "nameEn": "Upper port door",
+      "descriptionZh": "嵌入上接口门洞并带铰链与锁扣缺口的柔性门。",
+      "descriptionEn": "Flexible door seated in the upper port opening with hinge and latch reveal.",
+      "step": 2,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-009",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-005",
+      "nameZh": "下接口舱门",
+      "nameEn": "Lower port door",
+      "descriptionZh": "嵌入下接口门洞并带铰链与锁扣缺口的柔性门。",
+      "descriptionEn": "Flexible door seated in the lower port opening with hinge and latch reveal.",
+      "step": 2,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-017",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-01-001",
+      "nameZh": "机壳垫圈组",
+      "nameEn": "Shell washer set",
+      "descriptionZh": "六枚与机壳螺钉座对应的独立环形垫圈组成一个选择组。",
+      "descriptionEn": "Selectable set of six annular washers corresponding to the six shell-screw seats.",
+      "step": 2,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [
+        "Z50II-08-011",
+        "Z50II-08-012",
+        "Z50II-08-013",
+        "Z50II-08-014",
+        "Z50II-08-015",
+        "Z50II-08-016"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-010",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-002",
+      "nameZh": "快门释放按钮",
+      "nameEn": "Shutter-release button",
+      "descriptionZh": "嵌入握柄顶肩凹座的快门释放按钮参考件。",
+      "descriptionEn": "Reference shutter release seated in the grip-shoulder pocket.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-015",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-003",
+      "nameZh": "照片／视频选择器",
+      "nameEn": "Photo/video selector",
+      "descriptionZh": "嵌入机背凹座并带径向拨杆的照片／视频选择器。",
+      "descriptionEn": "Rear recessed photo/video selector with a radial lever.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-016",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-001",
+      "nameZh": "Fn1按钮",
+      "nameEn": "Fn1 button",
+      "descriptionZh": "位于独立前壳沉孔中的Fn1功能按钮。",
+      "descriptionEn": "Fn1 function button seated in a dedicated front-shell bore.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-018",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-001",
+      "nameZh": "镜头释放按钮",
+      "nameEn": "Lens-release button",
+      "descriptionZh": "预留Z卡口旁沉孔中的镜头释放按钮；本期不含镜头。",
+      "descriptionEn": "Lens-release button in a mount-side bore; no lens is included.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-05-001",
+      "moduleId": "05_power_storage",
+      "parentId": null,
+      "nameZh": "EN-EL25a参考电池",
+      "nameEn": "EN-EL25a reference battery",
+      "descriptionZh": "可拆卸的EN-EL25a产品外形参考件，包含定位肩、端子盖和握持筋；不表示Nikon生产尺寸。",
+      "descriptionEn": "Removable EN-EL25a product-shaped reference with keyed shoulder, terminal cap, and grip ribs; it does not claim Nikon production dimensions.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.052,
+      "dependsOn": [
+        "Z50II-02-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-05-006",
+      "moduleId": "05_power_storage",
+      "parentId": "Z50II-05-005",
+      "nameZh": "可拆卸SD卡示意件",
+      "nameEn": "Illustrative removable SD card",
+      "descriptionZh": "可拆卸SD卡的示意件，仅用于表达UHS-II卡槽装卸方向，不作为随机配件声明。",
+      "descriptionEn": "Illustrative removable SD card used only to show UHS-II slot insertion direction; it is not represented as an included accessory.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.046,
+      "dependsOn": [
+        "Z50II-02-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-008",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-001",
+      "nameZh": "菜单按钮",
+      "nameEn": "MENU button",
+      "descriptionZh": "嵌入独立圆形沉座的MENU按钮。",
+      "descriptionEn": "MENU button seated in a dedicated circular counterbore.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-009",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-001",
+      "nameZh": "播放按钮",
+      "nameEn": "Playback button",
+      "descriptionZh": "嵌入独立圆形沉座的播放按钮。",
+      "descriptionEn": "Playback button seated in a dedicated circular counterbore.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-010",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-001",
+      "nameZh": "删除按钮",
+      "nameEn": "Delete button",
+      "descriptionZh": "嵌入独立圆形沉座的删除按钮。",
+      "descriptionEn": "Delete button seated in a dedicated circular counterbore.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-011",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-001",
+      "nameZh": "方向键",
+      "nameEn": "Direction pad",
+      "descriptionZh": "具有中央开孔和四个实体方向瓣的环形方向键。",
+      "descriptionEn": "Annular direction pad with a true central opening and four physical directional lobes.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-012",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-011",
+      "nameZh": "OK确认按钮",
+      "nameEn": "OK button",
+      "descriptionZh": "位于方向键真实中心开孔中的独立OK确认按钮。",
+      "descriptionEn": "Independent OK button seated in the direction pad's true central opening.",
+      "step": 3,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-011",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-010",
+      "nameZh": "电源环",
+      "nameEn": "Power collar",
+      "descriptionZh": "带外伸拨杆和红色索引的快门同轴电源环。",
+      "descriptionEn": "Shutter-coaxial power collar with projecting lever and red index.",
+      "step": 4,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [
+        "Z50II-02-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-012",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-002",
+      "nameZh": "前指令拨轮",
+      "nameEn": "Front command dial",
+      "descriptionZh": "带周向齿槽并嵌入前握柄凹位的指令拨轮。",
+      "descriptionEn": "Knurled command dial recessed into the front grip pocket.",
+      "step": 4,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.02,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-013",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-003",
+      "nameZh": "后指令拨轮",
+      "nameEn": "Rear command dial",
+      "descriptionZh": "带可见齿槽并半嵌于后肩的指令拨轮。",
+      "descriptionEn": "Visibly knurled command dial partially recessed into the rear shoulder.",
+      "step": 4,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.02,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-014",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-003",
+      "nameZh": "模式拨盘",
+      "nameEn": "Mode dial",
+      "descriptionZh": "带24个周向防滑齿的顶部模式拨盘参考件。",
+      "descriptionEn": "Reference top mode dial with 24 visible circumferential knurls.",
+      "step": 4,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-017",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-001",
+      "nameZh": "Fn2按钮",
+      "nameEn": "Fn2 button",
+      "descriptionZh": "位于独立前壳沉孔中的Fn2功能按钮。",
+      "descriptionEn": "Fn2 function button seated in a dedicated front-shell bore.",
+      "step": 4,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [
+        "Z50II-02-016"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-019",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-005",
+      "nameZh": "左肩带环",
+      "nameEn": "Left strap lug",
+      "descriptionZh": "具有贯通眼孔的左侧金属肩带环参考件。",
+      "descriptionEn": "Reference left metal strap eyelet with a true open hole.",
+      "step": 4,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-020",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-006",
+      "nameZh": "右肩带环",
+      "nameEn": "Right strap lug",
+      "descriptionZh": "具有贯通眼孔的右侧金属肩带环参考件。",
+      "descriptionEn": "Reference right metal strap eyelet with a true open hole.",
+      "step": 4,
+      "explodeAxis": [
+        -1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-005",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-02-003",
+      "nameZh": "热靴导轨",
+      "nameEn": "Hot-shoe rails",
+      "descriptionZh": "具有双导轨、后桥和内翻压边的ISO 518热靴参考结构。",
+      "descriptionEn": "ISO 518 reference shoe structure with twin rails, rear bridge, and inward retention lips.",
+      "step": 4,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-008",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-06-007",
+      "nameZh": "闪光灯反光杯",
+      "nameEn": "Flash reflector",
+      "descriptionZh": "独立反光杯、扩散窗和横置闪光管的教学化组合。",
+      "descriptionEn": "Teaching assembly of separate reflector bowl, diffuser window, and transverse flash tube.",
+      "step": 4,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-05-007",
+      "moduleId": "05_power_storage",
+      "parentId": "Z50II-02-007",
+      "nameZh": "底部舱门锁扣",
+      "nameEn": "Bottom-door latch",
+      "descriptionZh": "底部舱门内侧的滑动锁扣，带独立锁钩和弹片。",
+      "descriptionEn": "Sliding inner bottom-door latch with separate hook and spring leaf.",
+      "step": 5,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [
+        "Z50II-02-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-003",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-06-001",
+      "nameZh": "电子取景器目镜",
+      "nameEn": "EVF eyepiece lens",
+      "descriptionZh": "位于观看孔后的独立圆角目镜片和遮光框。",
+      "descriptionEn": "Separate rounded eyepiece lens and light mask immediately behind the viewing aperture.",
+      "step": 5,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-004",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-06-001",
+      "nameZh": "屈光度调节轮",
+      "nameEn": "Diopter wheel",
+      "descriptionZh": "带十六个周向齿的侧置屈光度调节轮。",
+      "descriptionEn": "Side-mounted diopter wheel with sixteen readable circumferential knurls.",
+      "step": 5,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-006",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-06-005",
+      "nameZh": "热靴触点板",
+      "nameEn": "Hot-shoe contact plate",
+      "descriptionZh": "绝缘触点板包含中央同步触点和四个辅助触点。",
+      "descriptionEn": "Insulated contact plate with a central synchronization contact and four auxiliary contacts.",
+      "step": 5,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.016,
+      "dependsOn": [
+        "Z50II-06-005"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-007",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-06-009",
+      "nameZh": "内置闪光灯灯头外壳",
+      "nameEn": "Flash outer head",
+      "descriptionZh": "以铰轴为对象原点的开放式灯头框架，可用于后续弹起动画。",
+      "descriptionEn": "Open flash-head frame whose object origin is the hinge axis for a later pop-up animation.",
+      "step": 5,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.032,
+      "dependsOn": [
+        "Z50II-06-008"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-009",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-02-003",
+      "nameZh": "闪光灯铰链",
+      "nameEn": "Flash hinge",
+      "descriptionZh": "与灯头对象原点同轴的金属转轴及两端轴承座。",
+      "descriptionEn": "Metal pivot and two bearing blocks coaxial with the flash-head object origin.",
+      "step": 6,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-06-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-004",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-002",
+      "nameZh": "液晶屏盖玻璃",
+      "nameEn": "LCD cover glass",
+      "descriptionZh": "关闭屏幕最外侧的独立薄型盖玻璃。",
+      "descriptionEn": "Independent thin cover glass at the outermost face of the closed display.",
+      "step": 6,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.02,
+      "dependsOn": [],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-003",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-002",
+      "nameZh": "液晶显示面板",
+      "nameEn": "LCD panel",
+      "descriptionZh": "与框架和盖玻璃保持独立层间距的触控液晶显示层。",
+      "descriptionEn": "Touch LCD display layer with explicit spacing from both carrier and cover glass.",
+      "step": 7,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-07-004"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-002",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-001",
+      "nameZh": "液晶屏框架",
+      "nameEn": "LCD frame",
+      "descriptionZh": "以关闭状态嵌入后壳的3.2英寸级屏幕承载框。",
+      "descriptionEn": "3.2-inch-class screen carrier seated in the rear shell in its closed position.",
+      "step": 8,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.028,
+      "dependsOn": [
+        "Z50II-07-003"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-007",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-001",
+      "nameZh": "液晶屏铰链转轴",
+      "nameEn": "LCD hinge pivot",
+      "descriptionZh": "贯穿两支铰臂的竖直金属转轴，为后续开屏动画提供同轴基准。",
+      "descriptionEn": "Vertical metal pivot through both hinge arms, providing the coaxial basis for a later open-screen animation.",
+      "step": 9,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.06,
+      "dependsOn": [
+        "Z50II-07-002",
+        "Z50II-08-012",
+        "Z50II-08-014",
+        "Z50II-08-017"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-005",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-001",
+      "nameZh": "液晶屏内侧铰臂",
+      "nameEn": "Inner LCD hinge arm",
+      "descriptionZh": "由机身侧轴套、竖向连杆和下端安装面构成的内侧铰臂。",
+      "descriptionEn": "Inner hinge arm with body-side hub, vertical link, and lower mounting land.",
+      "step": 10,
+      "explodeAxis": [
+        -1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-07-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-006",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-07-002",
+      "nameZh": "液晶屏外侧铰臂",
+      "nameEn": "Outer LCD hinge arm",
+      "descriptionZh": "连接关闭屏幕框的外侧铰臂，与内臂共享动画转轴原点。",
+      "descriptionEn": "Outer hinge arm connecting the closed screen frame and sharing the animation pivot with the inner arm.",
+      "step": 10,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.028,
+      "dependsOn": [
+        "Z50II-07-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-07-001",
+      "moduleId": "07_rear_lcd_controls",
+      "parentId": "Z50II-02-001",
+      "nameZh": "后壳",
+      "nameEn": "Rear shell",
+      "descriptionZh": "由周边梁、屏幕开口、铰链口袋和真实按键座组成的中空后壳。",
+      "descriptionEn": "Hollow rear shell formed from perimeter rails, a screen opening, hinge pocket, and physical button seats.",
+      "step": 11,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.045,
+      "dependsOn": [
+        "Z50II-07-005",
+        "Z50II-07-006",
+        "Z50II-07-008",
+        "Z50II-07-009",
+        "Z50II-07-010",
+        "Z50II-07-011",
+        "Z50II-07-012",
+        "Z50II-08-013",
+        "Z50II-08-014",
+        "Z50II-08-017"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-005",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-001",
+      "nameZh": "左侧盖",
+      "nameEn": "Left side cover",
+      "descriptionZh": "带真实贯通门洞、止口和后接口翻边的左侧薄壁盖板。",
+      "descriptionEn": "Thin left cover with through door openings, reveals, and rear connector flange.",
+      "step": 12,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.03,
+      "dependsOn": [
+        "Z50II-02-008",
+        "Z50II-02-009",
+        "Z50II-08-012",
+        "Z50II-08-014"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-006",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-001",
+      "nameZh": "右握柄盖",
+      "nameEn": "Right grip cover",
+      "descriptionZh": "与收腰握柄连续过渡的开放式右侧薄壁盖板。",
+      "descriptionEn": "Open thin right-side cover flowing into the undercut grip.",
+      "step": 13,
+      "explodeAxis": [
+        -1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.034,
+      "dependsOn": [
+        "Z50II-02-020",
+        "Z50II-08-011",
+        "Z50II-08-013"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-004",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-001",
+      "nameZh": "底壳",
+      "nameEn": "Bottom shell",
+      "descriptionZh": "带收窄前后过渡和电池舱安装面的2毫米底部蒙皮。",
+      "descriptionEn": "Two-millimetre base skin with tapered transitions and battery-door land.",
+      "step": 14,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.035,
+      "dependsOn": [
+        "Z50II-02-007",
+        "Z50II-05-007",
+        "Z50II-08-015",
+        "Z50II-08-016",
+        "Z50II-08-017"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-003",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-001",
+      "nameZh": "顶壳",
+      "nameEn": "Top shell",
+      "descriptionZh": "带斜肩、复合EVF隆起与热靴安装面的薄壁顶壳参考件。",
+      "descriptionEn": "Thin profiled top shell with sloped shoulders, compound EVF hump, and hot-shoe land.",
+      "step": 15,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.042,
+      "dependsOn": [
+        "Z50II-02-013",
+        "Z50II-02-014",
+        "Z50II-02-015",
+        "Z50II-06-006",
+        "Z50II-06-009",
+        "Z50II-08-011",
+        "Z50II-08-012"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-002",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": "Z50II-02-001",
+      "nameZh": "握柄橡胶",
+      "nameEn": "Grip rubber",
+      "descriptionZh": "带收腰和掌托过渡的1.8毫米中空握柄蒙皮参考件。",
+      "descriptionEn": "Hollow 1.8 mm grip skin with undercut and palm-support transitions.",
+      "step": 16,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.038,
+      "dependsOn": [
+        "Z50II-02-006",
+        "Z50II-02-010",
+        "Z50II-02-011",
+        "Z50II-02-012"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-02-001",
+      "moduleId": "02_outer_shell_controls",
+      "parentId": null,
+      "nameZh": "前壳",
+      "nameEn": "Front shell",
+      "descriptionZh": "带开放后部、内翻边和55毫米卡口开口的薄壁外壳参考重建。",
+      "descriptionEn": "Thin open-back reference shell with inner flanges and a 55 mm mount opening.",
+      "step": 17,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.055,
+      "dependsOn": [
+        "Z50II-02-002",
+        "Z50II-02-003",
+        "Z50II-02-004",
+        "Z50II-02-005",
+        "Z50II-02-006",
+        "Z50II-02-018"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-001",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-02-003",
+      "nameZh": "电子取景器内壳",
+      "nameEn": "EVF housing",
+      "descriptionZh": "位于外部取景器隆起内部的开放式光学通道，包含三道遮光挡圈。",
+      "descriptionEn": "Open optical tunnel inside the exterior EVF hump, including three light-control baffles.",
+      "step": 17,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.032,
+      "dependsOn": [
+        "Z50II-02-003",
+        "Z50II-06-003",
+        "Z50II-06-004"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-002",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-06-001",
+      "nameZh": "电子取景器显示屏",
+      "nameEn": "EVF display",
+      "descriptionZh": "与目镜分层的微型显示面板、载板和排线插座参考组件。",
+      "descriptionEn": "Microdisplay reference assembly separated from the eyepiece, with carrier and flex socket.",
+      "step": 18,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.025,
+      "dependsOn": [
+        "Z50II-06-001"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-018",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-01-001",
+      "nameZh": "排线压板",
+      "nameEn": "Cable clamp",
+      "descriptionZh": "跨越四条信号排线通道的金属压板，带两个实体紧固孔位。",
+      "descriptionEn": "Metal clamp bridging the four signal-flex routes with two physical fastening locations.",
+      "step": 18,
+      "explodeAxis": [
+        -1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.018,
+      "dependsOn": [
+        "Z50II-02-005",
+        "Z50II-07-001"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-007",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-06-010",
+      "nameZh": "顶部控制排线",
+      "nameEn": "Top-control flex cable",
+      "descriptionZh": "从顶部控制板沿肩部折弯至后部连接区的五段排线。",
+      "descriptionEn": "Five-segment flex routed from the top-control board around the shoulder to the rear connector zone.",
+      "step": 19,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-02-001",
+        "Z50II-02-003",
+        "Z50II-08-018"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-008",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-07-001",
+      "nameZh": "后部控制排线",
+      "nameEn": "Rear-control flex cable",
+      "descriptionZh": "绕过屏幕铰链并沿后壳内侧转折的控制排线。",
+      "descriptionEn": "Rear-control flex bending around the LCD hinge and along the inner rear shell.",
+      "step": 19,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-07-001",
+        "Z50II-08-018"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-009",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-03-011",
+      "nameZh": "传感器排线",
+      "nameEn": "Sensor flex cable",
+      "descriptionZh": "从固定式传感器载板后缘弯折至主板连接区的宽排线。",
+      "descriptionEn": "Wide flex bending from the fixed sensor carrier edge to the main-board connector zone.",
+      "step": 19,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.026,
+      "dependsOn": [
+        "Z50II-02-001",
+        "Z50II-07-001",
+        "Z50II-08-018"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-010",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-08-005",
+      "nameZh": "接口板排线",
+      "nameEn": "Port flex cable",
+      "descriptionZh": "从侧置接口板绕至后部连接器的四次转折排线。",
+      "descriptionEn": "Port-board flex making four controlled bends to the rear connector bank.",
+      "step": 19,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-02-001",
+        "Z50II-02-005",
+        "Z50II-08-018"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-006",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-001",
+      "nameZh": "前部EMI屏蔽罩",
+      "nameEn": "Front EMI shield",
+      "descriptionZh": "位于元件前方的冲压式EMI屏蔽罩，带周边加强筋和通风细节。",
+      "descriptionEn": "Pressed front EMI shield ahead of the components, with perimeter ribs and vent detail.",
+      "step": 20,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.032,
+      "dependsOn": [
+        "Z50II-02-001",
+        "Z50II-08-009"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-007",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-001",
+      "nameZh": "后部EMI屏蔽罩",
+      "nameEn": "Rear EMI shield",
+      "descriptionZh": "与主板保持间隔的独立后部EMI屏蔽罩。",
+      "descriptionEn": "Independent rear EMI shield separated from the main board.",
+      "step": 20,
+      "explodeAxis": [
+        0.0,
+        -0.707107,
+        -0.707107
+      ],
+      "explodeDistance": 0.034,
+      "dependsOn": [
+        "Z50II-07-001",
+        "Z50II-08-007",
+        "Z50II-08-008",
+        "Z50II-08-009",
+        "Z50II-08-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-006",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-07-001",
+      "nameZh": "Wi-Fi／Bluetooth天线",
+      "nameEn": "Wi-Fi/Bluetooth antenna",
+      "descriptionZh": "沿后部上缘布置的薄型折线天线和同轴端子参考件。",
+      "descriptionEn": "Thin meander antenna and coax terminal routed along the upper rear edge.",
+      "step": 20,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [
+        "Z50II-07-001",
+        "Z50II-08-008"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-009",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-001",
+      "nameZh": "导热扩散片",
+      "nameEn": "Heat spreader",
+      "descriptionZh": "位于前屏蔽罩与导热垫之间的铜色扩散片和延伸翼片。",
+      "descriptionEn": "Copper-toned spreader with extension fins between front shield and thermal pad.",
+      "step": 21,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.026,
+      "dependsOn": [
+        "Z50II-04-006"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-011",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-010",
+      "nameZh": "射频屏蔽罩",
+      "nameEn": "RF shield can",
+      "descriptionZh": "覆盖次级控制板局部的独立折边射频屏蔽罩。",
+      "descriptionEn": "Separate folded RF shield can covering a local region of the secondary board.",
+      "step": 21,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [
+        "Z50II-04-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-012",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-001",
+      "nameZh": "排线连接器组",
+      "nameEn": "Flex-connector bank",
+      "descriptionZh": "五个具有独立锁扣的排线连接器外壳，用于教学识别接口位置。",
+      "descriptionEn": "Five flex-connector housings with separate latches for readable interface routing.",
+      "step": 21,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.02,
+      "dependsOn": [
+        "Z50II-04-007",
+        "Z50II-08-007",
+        "Z50II-08-008",
+        "Z50II-08-009",
+        "Z50II-08-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-001",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-08-005",
+      "nameZh": "USB Type-C接口",
+      "nameEn": "USB Type-C port",
+      "descriptionZh": "具有圆角金属壳、中央舌片和可见触点的Type-C SuperSpeed接口。",
+      "descriptionEn": "Type-C SuperSpeed connector with rounded metal shell, central tongue, and visible contacts.",
+      "step": 21,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [
+        "Z50II-02-005",
+        "Z50II-02-008",
+        "Z50II-08-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-002",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-08-005",
+      "nameZh": "Type-D HDMI接口",
+      "nameEn": "Type-D HDMI port",
+      "descriptionZh": "具有不对称梯形开口和触点排的Type-D HDMI接口。",
+      "descriptionEn": "HDMI Type-D connector with an asymmetric trapezoidal opening and contact row.",
+      "step": 21,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [
+        "Z50II-02-005",
+        "Z50II-02-008",
+        "Z50II-08-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-003",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-08-005",
+      "nameZh": "3.5毫米麦克风接口",
+      "nameEn": "3.5 mm microphone jack",
+      "descriptionZh": "具有真实圆孔、绝缘筒和后部触点的3.5毫米立体声麦克风接口。",
+      "descriptionEn": "3.5 mm stereo microphone input with a true circular opening, insulated barrel, and rear contact.",
+      "step": 21,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [
+        "Z50II-02-005",
+        "Z50II-02-009",
+        "Z50II-08-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-004",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-08-005",
+      "nameZh": "3.5毫米输出／遥控接口",
+      "nameEn": "3.5 mm output/remote jack",
+      "descriptionZh": "与麦克风口分离的3.5毫米音频输出／遥控复用接口。",
+      "descriptionEn": "Separate 3.5 mm combined audio-output/remote connector.",
+      "step": 21,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [
+        "Z50II-02-005",
+        "Z50II-02-009",
+        "Z50II-08-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-008",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-002",
+      "nameZh": "导热垫",
+      "nameEn": "Thermal pad",
+      "descriptionZh": "与扩散片和处理器均分离的柔性导热界面垫。",
+      "descriptionEn": "Flexible thermal interface pad physically separated from both spreader and processor.",
+      "step": 22,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.02,
+      "dependsOn": [
+        "Z50II-04-009"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-010",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-001",
+      "nameZh": "次级控制电路板",
+      "nameEn": "Secondary control PCB",
+      "descriptionZh": "主板侧边的狭长轮廓控制板，带独立贴片元件。",
+      "descriptionEn": "Narrow profiled control board beside the main PCB with separate surface packages.",
+      "step": 22,
+      "explodeAxis": [
+        0.0,
+        0.707107,
+        -0.707107
+      ],
+      "explodeDistance": 0.028,
+      "dependsOn": [
+        "Z50II-04-007",
+        "Z50II-04-011",
+        "Z50II-08-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-06-010",
+      "moduleId": "06_evf_top_flash",
+      "parentId": "Z50II-02-003",
+      "nameZh": "顶部控制电路板",
+      "nameEn": "Top-control PCB",
+      "descriptionZh": "位于顶壳下方的薄型控制板，带开关封装和排线座。",
+      "descriptionEn": "Thin control board below the top shell with switch packages and a flex socket.",
+      "step": 22,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.026,
+      "dependsOn": [
+        "Z50II-02-003",
+        "Z50II-08-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-08-005",
+      "moduleId": "08_io_flex_fasteners",
+      "parentId": "Z50II-04-001",
+      "nameZh": "接口子板",
+      "nameEn": "I/O daughterboard",
+      "descriptionZh": "承载四种官方公布接口形态的窄型侧置子板，带独立封装和排线座。",
+      "descriptionEn": "Narrow side daughterboard carrying the four published connector forms, with separate packages and flex socket.",
+      "step": 22,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.03,
+      "dependsOn": [
+        "Z50II-08-001",
+        "Z50II-08-002",
+        "Z50II-08-003",
+        "Z50II-08-004",
+        "Z50II-08-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-002",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-001",
+      "nameZh": "影像处理器封装",
+      "nameEn": "Processor package",
+      "descriptionZh": "位于导热通道后方的影像处理封装，带引脚和导热顶盖。",
+      "descriptionEn": "Image-processor package behind the thermal path, with visible leads and a heat cap.",
+      "step": 23,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-02-003",
+        "Z50II-04-006",
+        "Z50II-04-008",
+        "Z50II-06-001",
+        "Z50II-06-002"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-003",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-001",
+      "nameZh": "存储器封装A",
+      "nameEn": "Memory package A",
+      "descriptionZh": "处理器一侧的独立存储器封装A，用于教学分层。",
+      "descriptionEn": "Separate memory package A beside the processor for readable teaching-layer separation.",
+      "step": 23,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [
+        "Z50II-04-006",
+        "Z50II-04-009"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-004",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-001",
+      "nameZh": "存储器封装B",
+      "nameEn": "Memory package B",
+      "descriptionZh": "与A封装分离布置的存储器封装B。",
+      "descriptionEn": "Memory package B positioned separately from package A.",
+      "step": 23,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [
+        "Z50II-04-006",
+        "Z50II-04-009"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-005",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": "Z50II-04-001",
+      "nameZh": "电源管理元件组",
+      "nameEn": "Power-management cluster",
+      "descriptionZh": "由控制封装、电感和电容组成的可读电源管理簇。",
+      "descriptionEn": "Readable power-management cluster of controller package, inductors, and capacitors.",
+      "step": 23,
+      "explodeAxis": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-04-006",
+        "Z50II-04-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-05-005",
+      "moduleId": "05_power_storage",
+      "parentId": "Z50II-05-002",
+      "nameZh": "UHS-II SD卡槽",
+      "nameEn": "UHS-II SD slot",
+      "descriptionZh": "具有折边导轨、端部桥和两排触点的UHS-II SD卡槽参考件。",
+      "descriptionEn": "Reference UHS-II SD slot with folded rails, end bridges, and two readable contact rows.",
+      "step": 23,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.034,
+      "dependsOn": [
+        "Z50II-02-004",
+        "Z50II-05-006",
+        "Z50II-05-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-04-001",
+      "moduleId": "04_mainboard_thermal",
+      "parentId": null,
+      "nameZh": "主电路板",
+      "nameEn": "Main PCB",
+      "descriptionZh": "1.0毫米厚多层轮廓主板，带安装焊盘和可读的贴片元件带。",
+      "descriptionEn": "One-millimetre multi-layer profiled main board with mounting pads and readable surface-component rows.",
+      "step": 24,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.038,
+      "dependsOn": [
+        "Z50II-04-002",
+        "Z50II-04-003",
+        "Z50II-04-004",
+        "Z50II-04-005",
+        "Z50II-04-006",
+        "Z50II-04-007",
+        "Z50II-04-008",
+        "Z50II-04-009",
+        "Z50II-04-010",
+        "Z50II-04-012",
+        "Z50II-05-005",
+        "Z50II-08-006",
+        "Z50II-08-007",
+        "Z50II-08-008",
+        "Z50II-08-009",
+        "Z50II-08-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-05-003",
+      "moduleId": "05_power_storage",
+      "parentId": "Z50II-05-002",
+      "nameZh": "电池弹片触点",
+      "nameEn": "Battery contacts",
+      "descriptionZh": "五枚分开的弹片触点与绝缘支座，位于电池托架顶部。",
+      "descriptionEn": "Five separate spring contacts on an insulating carrier at the top of the battery cradle.",
+      "step": 25,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.028,
+      "dependsOn": [
+        "Z50II-02-004",
+        "Z50II-05-001"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-05-002",
+      "moduleId": "05_power_storage",
+      "parentId": "Z50II-01-003",
+      "nameZh": "电池托架",
+      "nameEn": "Battery cradle",
+      "descriptionZh": "由后壁、导轨、前缘和顶部限位组成的开放式电池托架。",
+      "descriptionEn": "Open battery cradle made from rear wall, guide rails, front lips, and an upper stop.",
+      "step": 26,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.044,
+      "dependsOn": [
+        "Z50II-02-004",
+        "Z50II-05-001",
+        "Z50II-05-003",
+        "Z50II-05-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-05-008",
+      "moduleId": "05_power_storage",
+      "parentId": "Z50II-05-004",
+      "nameZh": "电源排线",
+      "nameEn": "Power flex cable",
+      "descriptionZh": "沿托架与电源板边缘转折布线的薄型电源排线，带两端连接器。",
+      "descriptionEn": "Thin routed power flex following cradle and power-board edges, with connectors at both ends.",
+      "step": 27,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.026,
+      "dependsOn": [
+        "Z50II-02-004",
+        "Z50II-05-001",
+        "Z50II-05-002",
+        "Z50II-05-005",
+        "Z50II-07-001"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-05-004",
+      "moduleId": "05_power_storage",
+      "parentId": "Z50II-05-002",
+      "nameZh": "电源电路板",
+      "nameEn": "Power board",
+      "descriptionZh": "带键位轮廓、功率封装和连接焊盘的1.0毫米电源板。",
+      "descriptionEn": "One-millimetre keyed power board with power packages and connector pads.",
+      "step": 28,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.03,
+      "dependsOn": [
+        "Z50II-02-004",
+        "Z50II-05-002",
+        "Z50II-05-005",
+        "Z50II-05-008"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-001",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": null,
+      "nameZh": "Z卡口环",
+      "nameEn": "Z mount ring",
+      "descriptionZh": "具有卡爪和四个紧固座的Z卡口金属环；内部尺寸为参考重建。",
+      "descriptionEn": "Z-mount metal ring with bayonet tabs and four fastening lands; internal dimensions are a reference reconstruction.",
+      "step": 29,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.038,
+      "dependsOn": [
+        "Z50II-02-001"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-002",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-03-001",
+      "nameZh": "卡口密封圈",
+      "nameEn": "Mount gasket",
+      "descriptionZh": "位于金属卡口后方的独立弹性防尘密封圈。",
+      "descriptionEn": "Separate elastomer dust gasket immediately behind the metal mount.",
+      "step": 30,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.034,
+      "dependsOn": [
+        "Z50II-03-001"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-003",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-03-001",
+      "nameZh": "卡口触点座",
+      "nameEn": "Mount contact block",
+      "descriptionZh": "弧形区域内的绝缘触点座，为后续镜头接口保留位置。",
+      "descriptionEn": "Insulated mount contact carrier positioned for the reserved future lens interface.",
+      "step": 30,
+      "explodeAxis": [
+        0.0,
+        1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.032,
+      "dependsOn": [
+        "Z50II-03-001"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-004",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-03-003",
+      "nameZh": "卡口触点针组",
+      "nameEn": "Mount contact-pin bank",
+      "descriptionZh": "11枚独立圆头导电针的教学化触点组。",
+      "descriptionEn": "Teaching representation of an eleven-pin bank with separate rounded conductive contacts.",
+      "step": 31,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.03,
+      "dependsOn": [
+        "Z50II-03-003"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-005",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-03-001",
+      "nameZh": "卡口间隔环",
+      "nameEn": "Mount spacer",
+      "descriptionZh": "保持卡口与快门组件间光路间隔的开放式支承环。",
+      "descriptionEn": "Open support ring preserving the optical-path spacing between mount and shutter assembly.",
+      "step": 31,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.03,
+      "dependsOn": [
+        "Z50II-03-002"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-006",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-03-008",
+      "nameZh": "快门前帘",
+      "nameEn": "Shutter front curtain",
+      "descriptionZh": "由七片薄金属叶片表达的前帘，位于卡口与传感器之间。",
+      "descriptionEn": "Front curtain represented by seven thin metal lamellae between mount and sensor.",
+      "step": 32,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.028,
+      "dependsOn": [
+        "Z50II-03-005"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-007",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-03-008",
+      "nameZh": "快门后帘",
+      "nameEn": "Shutter rear curtain",
+      "descriptionZh": "与前帘分层对齐的第二组薄金属叶片。",
+      "descriptionEn": "Second aligned set of thin metal lamellae, physically separated behind the front curtain.",
+      "step": 33,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.027,
+      "dependsOn": [
+        "Z50II-03-006"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-008",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-01-005",
+      "nameZh": "快门框架",
+      "nameEn": "Shutter frame",
+      "descriptionZh": "包含导轨和驱动罩的开放式纵走焦平面快门框架。",
+      "descriptionEn": "Open vertical-travel focal-plane shutter frame with guides and drive housing.",
+      "step": 34,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.026,
+      "dependsOn": [
+        "Z50II-03-007"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-012",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-03-009",
+      "nameZh": "传感器防尘框",
+      "nameEn": "Sensor dust shield",
+      "descriptionZh": "在快门与盖玻璃之间形成独立周边防尘边界的开放框。",
+      "descriptionEn": "Open perimeter dust shield forming a separate boundary between shutter and cover glass.",
+      "step": 35,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-03-008"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-010",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-03-009",
+      "nameZh": "传感器盖玻璃",
+      "nameEn": "Sensor cover glass",
+      "descriptionZh": "与感光面分离的薄型光学盖玻璃参考件。",
+      "descriptionEn": "Thin optical cover-glass reference element separated from the photosensitive plane.",
+      "step": 36,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-03-012"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-009",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-01-005",
+      "nameZh": "固定式DX传感器封装",
+      "nameEn": "Fixed DX sensor package",
+      "descriptionZh": "23.5×15.7毫米DX有效面尺寸锚点；本参考模型为固定式传感器，不含机身防抖机构。",
+      "descriptionEn": "23.5 x 15.7 mm DX active-area anchor; this reference model uses a fixed sensor and contains no in-body stabilization mechanism.",
+      "step": 37,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.025,
+      "dependsOn": [
+        "Z50II-03-010"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-01-004",
+      "moduleId": "01_chassis_front",
+      "parentId": "Z50II-01-002",
+      "nameZh": "卡口支撑板",
+      "nameEn": "Mount support plate",
+      "descriptionZh": "围绕预留卡口原点的环形支撑板和四个紧固安装面。",
+      "descriptionEn": "Annular support and four fastening lands around the reserved mount origin.",
+      "step": 38,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.03,
+      "dependsOn": [
+        "Z50II-02-001",
+        "Z50II-02-017",
+        "Z50II-03-005"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-01-006",
+      "moduleId": "01_chassis_front",
+      "parentId": "Z50II-01-001",
+      "nameZh": "底部加强板",
+      "nameEn": "Bottom reinforcement plate",
+      "descriptionZh": "带冲压式纵横加强筋和三脚架安装区的1.8毫米底部加强板。",
+      "descriptionEn": "1.8 mm base reinforcement with formed longitudinal/cross ribs and tripod land.",
+      "step": 38,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.028,
+      "dependsOn": [
+        "Z50II-02-001",
+        "Z50II-02-004",
+        "Z50II-05-004",
+        "Z50II-08-017"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-03-011",
+      "moduleId": "03_mount_shutter_sensor",
+      "parentId": "Z50II-03-009",
+      "nameZh": "传感器电路板",
+      "nameEn": "Sensor PCB",
+      "descriptionZh": "具有边缘焊盘、控制封装和定位切角的传感器载板。",
+      "descriptionEn": "Sensor carrier PCB with edge pads, controller package, and keyed profile.",
+      "step": 38,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.028,
+      "dependsOn": [
+        "Z50II-03-009",
+        "Z50II-08-009"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-01-002",
+      "moduleId": "01_chassis_front",
+      "parentId": "Z50II-01-001",
+      "nameZh": "前部内框",
+      "nameEn": "Front inner frame",
+      "descriptionZh": "由环形薄壁梁和四个壳体安装耳组成的开放前内框。",
+      "descriptionEn": "Open front inner frame made from a thin ring beam and four shell-mount tabs.",
+      "step": 39,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.032,
+      "dependsOn": [
+        "Z50II-01-004",
+        "Z50II-02-018",
+        "Z50II-03-005"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-01-003",
+      "moduleId": "01_chassis_front",
+      "parentId": "Z50II-01-001",
+      "nameZh": "握柄内框",
+      "nameEn": "Grip inner frame",
+      "descriptionZh": "由纵梁、横梁和掌托薄壁网组成的开放握柄笼架。",
+      "descriptionEn": "Open grip cage formed by longitudinal rails, cross-members, and a thin palm web.",
+      "step": 39,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDistance": 0.035,
+      "dependsOn": [
+        "Z50II-02-001",
+        "Z50II-02-002",
+        "Z50II-02-006"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-01-005",
+      "moduleId": "01_chassis_front",
+      "parentId": "Z50II-01-001",
+      "nameZh": "传感器导轨框",
+      "nameEn": "Sensor rail frame",
+      "descriptionZh": "为后续传感器模块保留空间的四边导轨和角部安装柱。",
+      "descriptionEn": "Four-sided rail with corner bosses reserving the later sensor-module volume.",
+      "step": 39,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.034,
+      "dependsOn": [
+        "Z50II-03-011",
+        "Z50II-04-001",
+        "Z50II-04-002",
+        "Z50II-04-003",
+        "Z50II-04-004",
+        "Z50II-04-005",
+        "Z50II-04-006",
+        "Z50II-04-008",
+        "Z50II-04-009",
+        "Z50II-08-009"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-01-007",
+      "moduleId": "01_chassis_front",
+      "parentId": "Z50II-01-006",
+      "nameZh": "三脚架接口座",
+      "nameEn": "Tripod socket",
+      "descriptionZh": "由金属接口、环形安装面与四向加强肋组成的参考三脚架座。",
+      "descriptionEn": "Reference tripod socket with metal insert, annular land, and four reinforcing webs.",
+      "step": 39,
+      "explodeAxis": [
+        0.0,
+        -1.0,
+        -0.0
+      ],
+      "explodeDistance": 0.022,
+      "dependsOn": [
+        "Z50II-01-006"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-01-008",
+      "moduleId": "01_chassis_front",
+      "parentId": "Z50II-01-001",
+      "nameZh": "肩带环加强件（成对）",
+      "nameEn": "Strap-lug reinforcement pair",
+      "descriptionZh": "左右肩带眼载荷位置的成对安装柱与斜撑参考件。",
+      "descriptionEn": "Paired reference mounting posts and diagonal webs at the strap-eyelet load paths.",
+      "step": 39,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.024,
+      "dependsOn": [
+        "Z50II-02-001",
+        "Z50II-02-019",
+        "Z50II-02-020",
+        "Z50II-07-001"
+      ],
+      "isReferenceGeometry": true
+    },
+    {
+      "partId": "Z50II-01-001",
+      "moduleId": "01_chassis_front",
+      "parentId": null,
+      "nameZh": "镁合金主机架",
+      "nameEn": "Magnesium chassis",
+      "descriptionZh": "围绕55毫米卡口开口布置的开放式环梁、边梁、斜撑和安装柱参考机架。",
+      "descriptionEn": "Open reference chassis of mount ring, perimeter rails, diagonal webs, and bosses around the 55 mm opening.",
+      "step": 40,
+      "explodeAxis": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDistance": 0.042,
+      "dependsOn": [
+        "Z50II-01-003",
+        "Z50II-01-005",
+        "Z50II-01-007",
+        "Z50II-01-008",
+        "Z50II-04-001",
+        "Z50II-08-006"
+      ],
+      "isReferenceGeometry": true
+    }
+  ],
+  "steps": [
+    {
+      "step": 1,
+      "titleZh": "拆卸：左上机壳螺钉",
+      "titleEn": "Remove Upper-left shell screw",
+      "partIds": [
+        "Z50II-08-011",
+        "Z50II-08-012",
+        "Z50II-08-013",
+        "Z50II-08-014",
+        "Z50II-08-015",
+        "Z50II-08-016"
+      ],
+      "cameraPreset": "left"
+    },
+    {
+      "step": 2,
+      "titleZh": "拆卸：电池舱门",
+      "titleEn": "Remove Battery door",
+      "partIds": [
+        "Z50II-02-007",
+        "Z50II-02-008",
+        "Z50II-02-009",
+        "Z50II-08-017"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 3,
+      "titleZh": "拆卸：快门释放按钮",
+      "titleEn": "Remove Shutter-release button",
+      "partIds": [
+        "Z50II-02-010",
+        "Z50II-02-015",
+        "Z50II-02-016",
+        "Z50II-02-018",
+        "Z50II-05-001",
+        "Z50II-05-006",
+        "Z50II-07-008",
+        "Z50II-07-009",
+        "Z50II-07-010",
+        "Z50II-07-011",
+        "Z50II-07-012"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 4,
+      "titleZh": "拆卸：电源环",
+      "titleEn": "Remove Power collar",
+      "partIds": [
+        "Z50II-02-011",
+        "Z50II-02-012",
+        "Z50II-02-013",
+        "Z50II-02-014",
+        "Z50II-02-017",
+        "Z50II-02-019",
+        "Z50II-02-020",
+        "Z50II-06-005",
+        "Z50II-06-008"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 5,
+      "titleZh": "拆卸：底部舱门锁扣",
+      "titleEn": "Remove Bottom-door latch",
+      "partIds": [
+        "Z50II-05-007",
+        "Z50II-06-003",
+        "Z50II-06-004",
+        "Z50II-06-006",
+        "Z50II-06-007"
+      ],
+      "cameraPreset": "bottom"
+    },
+    {
+      "step": 6,
+      "titleZh": "拆卸：闪光灯铰链",
+      "titleEn": "Remove Flash hinge",
+      "partIds": [
+        "Z50II-06-009",
+        "Z50II-07-004"
+      ],
+      "cameraPreset": "top"
+    },
+    {
+      "step": 7,
+      "titleZh": "拆卸：液晶显示面板",
+      "titleEn": "Remove LCD panel",
+      "partIds": [
+        "Z50II-07-003"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 8,
+      "titleZh": "拆卸：液晶屏框架",
+      "titleEn": "Remove LCD frame",
+      "partIds": [
+        "Z50II-07-002"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 9,
+      "titleZh": "拆卸：液晶屏铰链转轴",
+      "titleEn": "Remove LCD hinge pivot",
+      "partIds": [
+        "Z50II-07-007"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 10,
+      "titleZh": "拆卸：液晶屏内侧铰臂",
+      "titleEn": "Remove Inner LCD hinge arm",
+      "partIds": [
+        "Z50II-07-005",
+        "Z50II-07-006"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 11,
+      "titleZh": "拆卸：后壳",
+      "titleEn": "Remove Rear shell",
+      "partIds": [
+        "Z50II-07-001"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 12,
+      "titleZh": "拆卸：左侧盖",
+      "titleEn": "Remove Left side cover",
+      "partIds": [
+        "Z50II-02-005"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 13,
+      "titleZh": "拆卸：右握柄盖",
+      "titleEn": "Remove Right grip cover",
+      "partIds": [
+        "Z50II-02-006"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 14,
+      "titleZh": "拆卸：底壳",
+      "titleEn": "Remove Bottom shell",
+      "partIds": [
+        "Z50II-02-004"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 15,
+      "titleZh": "拆卸：顶壳",
+      "titleEn": "Remove Top shell",
+      "partIds": [
+        "Z50II-02-003"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 16,
+      "titleZh": "拆卸：握柄橡胶",
+      "titleEn": "Remove Grip rubber",
+      "partIds": [
+        "Z50II-02-002"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 17,
+      "titleZh": "拆卸：前壳",
+      "titleEn": "Remove Front shell",
+      "partIds": [
+        "Z50II-02-001",
+        "Z50II-06-001"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 18,
+      "titleZh": "拆卸：电子取景器显示屏",
+      "titleEn": "Remove EVF display",
+      "partIds": [
+        "Z50II-06-002",
+        "Z50II-08-018"
+      ],
+      "cameraPreset": "top"
+    },
+    {
+      "step": 19,
+      "titleZh": "拆卸：顶部控制排线",
+      "titleEn": "Remove Top-control flex cable",
+      "partIds": [
+        "Z50II-08-007",
+        "Z50II-08-008",
+        "Z50II-08-009",
+        "Z50II-08-010"
+      ],
+      "cameraPreset": "left"
+    },
+    {
+      "step": 20,
+      "titleZh": "拆卸：前部EMI屏蔽罩",
+      "titleEn": "Remove Front EMI shield",
+      "partIds": [
+        "Z50II-04-006",
+        "Z50II-04-007",
+        "Z50II-08-006"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 21,
+      "titleZh": "拆卸：导热扩散片",
+      "titleEn": "Remove Heat spreader",
+      "partIds": [
+        "Z50II-04-009",
+        "Z50II-04-011",
+        "Z50II-04-012",
+        "Z50II-08-001",
+        "Z50II-08-002",
+        "Z50II-08-003",
+        "Z50II-08-004"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 22,
+      "titleZh": "拆卸：导热垫",
+      "titleEn": "Remove Thermal pad",
+      "partIds": [
+        "Z50II-04-008",
+        "Z50II-04-010",
+        "Z50II-06-010",
+        "Z50II-08-005"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 23,
+      "titleZh": "拆卸：影像处理器封装",
+      "titleEn": "Remove Processor package",
+      "partIds": [
+        "Z50II-04-002",
+        "Z50II-04-003",
+        "Z50II-04-004",
+        "Z50II-04-005",
+        "Z50II-05-005"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 24,
+      "titleZh": "拆卸：主电路板",
+      "titleEn": "Remove Main PCB",
+      "partIds": [
+        "Z50II-04-001"
+      ],
+      "cameraPreset": "rear"
+    },
+    {
+      "step": 25,
+      "titleZh": "拆卸：电池弹片触点",
+      "titleEn": "Remove Battery contacts",
+      "partIds": [
+        "Z50II-05-003"
+      ],
+      "cameraPreset": "bottom"
+    },
+    {
+      "step": 26,
+      "titleZh": "拆卸：电池托架",
+      "titleEn": "Remove Battery cradle",
+      "partIds": [
+        "Z50II-05-002"
+      ],
+      "cameraPreset": "bottom"
+    },
+    {
+      "step": 27,
+      "titleZh": "拆卸：电源排线",
+      "titleEn": "Remove Power flex cable",
+      "partIds": [
+        "Z50II-05-008"
+      ],
+      "cameraPreset": "bottom"
+    },
+    {
+      "step": 28,
+      "titleZh": "拆卸：电源电路板",
+      "titleEn": "Remove Power board",
+      "partIds": [
+        "Z50II-05-004"
+      ],
+      "cameraPreset": "bottom"
+    },
+    {
+      "step": 29,
+      "titleZh": "拆卸：Z卡口环",
+      "titleEn": "Remove Z mount ring",
+      "partIds": [
+        "Z50II-03-001"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 30,
+      "titleZh": "拆卸：卡口密封圈",
+      "titleEn": "Remove Mount gasket",
+      "partIds": [
+        "Z50II-03-002",
+        "Z50II-03-003"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 31,
+      "titleZh": "拆卸：卡口触点针组",
+      "titleEn": "Remove Mount contact-pin bank",
+      "partIds": [
+        "Z50II-03-004",
+        "Z50II-03-005"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 32,
+      "titleZh": "拆卸：快门前帘",
+      "titleEn": "Remove Shutter front curtain",
+      "partIds": [
+        "Z50II-03-006"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 33,
+      "titleZh": "拆卸：快门后帘",
+      "titleEn": "Remove Shutter rear curtain",
+      "partIds": [
+        "Z50II-03-007"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 34,
+      "titleZh": "拆卸：快门框架",
+      "titleEn": "Remove Shutter frame",
+      "partIds": [
+        "Z50II-03-008"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 35,
+      "titleZh": "拆卸：传感器防尘框",
+      "titleEn": "Remove Sensor dust shield",
+      "partIds": [
+        "Z50II-03-012"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 36,
+      "titleZh": "拆卸：传感器盖玻璃",
+      "titleEn": "Remove Sensor cover glass",
+      "partIds": [
+        "Z50II-03-010"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 37,
+      "titleZh": "拆卸：固定式DX传感器封装",
+      "titleEn": "Remove Fixed DX sensor package",
+      "partIds": [
+        "Z50II-03-009"
+      ],
+      "cameraPreset": "front"
+    },
+    {
+      "step": 38,
+      "titleZh": "拆卸：卡口支撑板",
+      "titleEn": "Remove Mount support plate",
+      "partIds": [
+        "Z50II-01-004",
+        "Z50II-01-006",
+        "Z50II-03-011"
+      ],
+      "cameraPreset": "three-quarter"
+    },
+    {
+      "step": 39,
+      "titleZh": "拆卸：前部内框",
+      "titleEn": "Remove Front inner frame",
+      "partIds": [
+        "Z50II-01-002",
+        "Z50II-01-003",
+        "Z50II-01-005",
+        "Z50II-01-007",
+        "Z50II-01-008"
+      ],
+      "cameraPreset": "three-quarter"
+    },
+    {
+      "step": 40,
+      "titleZh": "拆卸：镁合金主机架",
+      "titleEn": "Remove Magnesium chassis",
+      "partIds": [
+        "Z50II-01-001"
+      ],
+      "cameraPreset": "three-quarter"
+    }
+  ]
+}

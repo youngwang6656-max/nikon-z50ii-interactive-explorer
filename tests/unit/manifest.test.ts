@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixture from '../fixtures/assembly-manifest.valid.json';
+import exportedManifest from '../../public/assembly-manifest.json';
 import { parseManifest, validateManifest } from '../../src/domain/manifest';
 
 describe('manifest contract', () => {
@@ -7,6 +8,15 @@ describe('manifest contract', () => {
     const manifest = parseManifest(fixture);
     expect(manifest.schemaVersion).toBe(1);
     expect(manifest.parts).toHaveLength(2);
+  });
+
+  it('parses the complete modular browser export', () => {
+    const manifest = parseManifest(exportedManifest);
+    expect(manifest.modules).toHaveLength(8);
+    expect(manifest.parts).toHaveLength(100);
+    expect(manifest.steps.map(({ step }) => step)).toEqual(
+      Array.from({ length: 40 }, (_, index) => index + 1),
+    );
   });
 
   it.each(['duplicate-id', 'missing-dependency', 'non-unit-axis', 'dependency-cycle'])
