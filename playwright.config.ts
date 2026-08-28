@@ -1,5 +1,10 @@
 import { defineConfig } from '@playwright/test';
 
+const environment = (globalThis as {
+  process?: { env?: Record<string, string | undefined> };
+}).process?.env;
+const executablePath = environment?.PLAYWRIGHT_EXECUTABLE_PATH;
+
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
@@ -8,16 +13,11 @@ export default defineConfig({
   reporter: 'line',
   use: {
     baseURL: 'http://127.0.0.1:4175',
+    browserName: 'chromium',
+    ...(executablePath
+      ? { launchOptions: { executablePath } }
+      : { channel: 'chrome' as const }),
     headless: true,
     viewport: { width: 1440, height: 900 },
-    launchOptions: {
-      executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    },
-  },
-  webServer: {
-    command: 'node ./node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4175',
-    url: 'http://127.0.0.1:4175',
-    reuseExistingServer: false,
-    timeout: 30_000,
   },
 });

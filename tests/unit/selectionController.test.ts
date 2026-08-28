@@ -193,7 +193,7 @@ describe('SelectionController', () => {
     expect(harness.releasePointerCapture).toHaveBeenCalledWith(7);
   });
 
-  it('cancels an active pointer without picking and ignores other pointers', () => {
+  it('cancels an active multi-pointer gesture without picking', () => {
     const harness = canvasHarness();
     const intersect = vi.fn(() => []);
     const controller = new SelectionController({
@@ -211,7 +211,36 @@ describe('SelectionController', () => {
     harness.dispatch('pointerup', { pointerId: 4 });
 
     expect(intersect).not.toHaveBeenCalled();
-    expect(harness.setPointerCapture).toHaveBeenCalledTimes(1);
+    expect(harness.setPointerCapture).toHaveBeenCalledTimes(2);
     controller.dispose();
+  });
+
+  it('invalidates a click after a second pointer and recovers after every pointer ends', () => {
+    const harness = canvasHarness();
+    const selected = part('selected');
+    const intersect = vi.fn(() => [{ object: selected.mesh, distance: 1 }]);
+    const controller = new SelectionController({
+      canvas: harness.canvas,
+      camera: new PerspectiveCamera(),
+      assemblyRoot: selected.root,
+      outlinePass: { selectedObjects: [] },
+      partIndex: new Map([['selected', selected.root]]),
+      intersect,
+    });
+
+    harness.dispatch('pointerdown', { pointerId: 1, isPrimary: true });
+    harness.dispatch('pointerdown', { pointerId: 2, isPrimary: false });
+    harness.dispatch('pointermove', { pointerId: 2, clientX: 90, clientY: 70 });
+    harness.dispatch('pointerup', { pointerId: 2, isPrimary: false });
+    harness.dispatch('pointerup', { pointerId: 1, isPrimary: true });
+
+    expect(intersect).not.toHaveBeenCalled();
+    expect(controller.selectedPartId).toBeNull();
+
+    harness.dispatch('pointerdown', { pointerId: 3, isPrimary: true });
+    harness.dispatch('pointerup', { pointerId: 3, isPrimary: true });
+
+    expect(intersect).toHaveBeenCalledTimes(1);
+    expect(controller.selectedPartId).toBe('selected');
   });
 });

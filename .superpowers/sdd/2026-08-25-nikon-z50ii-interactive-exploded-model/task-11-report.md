@@ -142,3 +142,26 @@ These Fix Round 1 images replace the stale `task-11-desktop.png` and `task-11-mo
 ### Environment note
 
 The first repository wrapper invocation failed before tests because bundled `pnpm.cmd` could not resolve `node`; prepending the bundled Node directory resolved it. On this managed Windows host, Playwright's owned `webServer` mode reports the test `ok` but hangs while tearing down the Vite child process. Playwright documents that graceful SIGINT/SIGTERM shutdown is ignored on Windows. Running the same CLI test against a separately started preview exits normally with **1 passed**; the preview was then stopped and the temporary external-server config removed. The existing Vite bundle-size warning remains unchanged.
+
+## Fix Round 2 (reviewed commit `f62e768`)
+
+### Multi-pointer gesture invalidation
+
+- Reproduced the reviewer sequence before implementation: pointer 1 down, pointer 2 down/move/up, pointer 1 up called the intersection/pick path once.
+- Added a direct regression for that exact sequence plus a clean pointer 3 down/up recovery click. The RED assertion reported one unexpected intersection; the GREEN assertion reports zero intersections for the multi-pointer gesture and exactly one for the later clean click.
+- `SelectionController` now tracks every pressed and captured pointer ID for the whole gesture. Any additional or non-primary pointer invalidates the click candidate immediately.
+- Secondary pointers are captured as direct canvas-owned pointers so their up/cancel transitions remain observable. `pointerup`, `pointercancel`, and unexpected `lostpointercapture` each clear only their exact pointer; click eligibility resets only after all tracked pointers are gone.
+- Disposal releases every still-owned capture before clearing gesture state. The existing drag-distance and idempotent listener-disposal behavior remains intact.
+
+### Portable, terminating E2E entry point
+
+- Removed the absolute Windows Chrome executable and Playwright-owned `webServer` from `playwright.config.ts`.
+- Browser launch now uses Playwright's portable installed-Chrome channel resolution. A nonstandard installation can be selected with the documented `PLAYWRIGHT_EXECUTABLE_PATH` environment variable.
+- `pnpm test:e2e` now runs `scripts/run-e2e.mjs`. The harness validates exclusive ownership of `127.0.0.1:4175`, starts Vite as a direct Node child without a shell, waits for an HTTP-ready response, runs the Playwright CLI without a configured web server, and stops the exact child PID in `finally` and signal paths. A bounded force-kill fallback fails the command if the owned process cannot be stopped.
+- The committed command ran twice consecutively with exit code 0: **1 / 1 passed** in 9.7 s with preview PID 25384 stopped, then **1 / 1 passed** in 9.3 s with preview PID 46556 stopped. The second run's exclusive bind proves the first left no listener; a final independent bind printed `PORT_4175_FREE`, and neither PID remained.
+
+### Verification
+
+- Focused pointer suite: **7 / 7 passed**.
+- Full check: ten suites, **48 / 48 passed**, followed by `tsc --noEmit` and the production Vite build.
+- Existing Vite main-chunk size warning remains the only build concern and predates this fix round.
