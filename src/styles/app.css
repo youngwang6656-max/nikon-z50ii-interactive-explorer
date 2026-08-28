@@ -743,3 +743,56 @@ summary:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .module-group[data-status="loading"] .module-indicator { animation: none; }
 }
+
+/* Readable instrumentation type: retain density without sub-10px controls. */
+.brand-kicker,
+.system-state,
+.panel-index,
+.panel-meta,
+.timeline-count,
+.hud-label,
+.hud-coordinate,
+.inspector-empty-copy {
+  font-size: 10px;
+}
+
+.tree-search,
+.part-name-zh,
+.inspector-action {
+  font-size: 11px;
+}
+
+.load-all-button,
+.load-progress,
+.module-name-en,
+.module-status,
+.part-code,
+.part-name-en,
+.inspector-part-id,
+.reconstruction-badge,
+.inspector-description-en,
+.inspector-metrics dt,
+.inspector-metrics dd,
+.dependency-section h4,
+.dependency-list li {
+  font-size: 10px;
+}
+
+.module-name-zh,
+.inspector-name-en,
+.notice-copy {
+  font-size: 11px;
+}
+
+.inspector-description-zh {
+  font-size: 12px;
+}
+
+.module-copy,
+.module-name-zh,
+.module-name-en {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

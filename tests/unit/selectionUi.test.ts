@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import fixture from '../../public/assembly-manifest.json';
 import { createAssemblyState } from '../../src/domain/assemblyState';
 import { parseManifest } from '../../src/domain/manifest';
-import { filterAssemblyParts } from '../../src/ui/assemblyTree';
+import { filterAssemblyParts, visibleAssemblyPartIds } from '../../src/ui/assemblyTree';
 import { createInspectorViewModel } from '../../src/ui/inspector';
 
 const manifest = parseManifest(fixture);
@@ -34,5 +34,13 @@ describe('selection UI models', () => {
         return `${dependency.nameZh} / ${dependency.nameEn}`;
       }),
     );
+  });
+
+  it('keeps a canvas-selected row visible outside the active search filter', () => {
+    const selected = manifest.parts.find((part) => !part.nameZh.includes('传感器') && !part.nameEn.toLowerCase().includes('sensor'))!;
+    const visible = visibleAssemblyPartIds(manifest.parts, '传感器', selected.partId);
+
+    expect(visible.has(selected.partId)).toBe(true);
+    expect(visible.size).toBeGreaterThan(1);
   });
 });

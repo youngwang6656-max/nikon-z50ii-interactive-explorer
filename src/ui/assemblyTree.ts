@@ -28,6 +28,18 @@ export function filterAssemblyParts(
   );
 }
 
+export function visibleAssemblyPartIds(
+  parts: readonly PartManifest[],
+  query: string,
+  selectedPartId: string | null,
+): Set<string> {
+  const visible = new Set(filterAssemblyParts(parts, query).map((part) => part.partId));
+  if (selectedPartId && parts.some((part) => part.partId === selectedPartId)) {
+    visible.add(selectedPartId);
+  }
+  return visible;
+}
+
 function element<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className: string,
@@ -69,6 +81,7 @@ export function mountAssemblyTree(
   tools.append(search, loadAll, progress);
 
   const list = element('div', 'module-list');
+  let selectedPartId: string | null = null;
   const partButtons = new Map<string, HTMLButtonElement>();
   const moduleRows = new Map<string, HTMLDetailsElement>();
   for (const [index, module] of manifest.modules.entries()) {
@@ -86,6 +99,8 @@ export function mountAssemblyTree(
     );
     const moduleStatus = element('span', 'module-status', '未加载');
     summary.append(indicator, names, moduleStatus);
+    summary.setAttribute('aria-label', `${module.nameZh}，${module.nameEn}，未加载`);
+    details.setAttribute('aria-label', `${module.nameZh}，${module.nameEn}，未加载`);
     const parts = element('div', 'part-list');
     for (const part of manifest.parts.filter((candidate) => candidate.moduleId === module.moduleId)) {
       const button = element('button', 'part-row');
@@ -110,7 +125,7 @@ export function mountAssemblyTree(
   host.replaceChildren(root);
 
   const handleSearch = (): void => {
-    const matches = new Set(filterAssemblyParts(manifest.parts, search.value).map((part) => part.partId));
+    const matches = visibleAssemblyPartIds(manifest.parts, search.value, selectedPartId);
     const hasQuery = search.value.trim().length > 0;
     for (const module of manifest.modules) {
       let moduleHasMatch = false;
@@ -144,11 +159,13 @@ export function mountAssemblyTree(
   return {
     searchInput: search,
     select(partId) {
+      selectedPartId = partId;
       partButtons.forEach((button, id) => {
         button.classList.toggle('is-selected', id === partId);
         if (id === partId) button.setAttribute('aria-current', 'true');
         else button.removeAttribute('aria-current');
       });
+      handleSearch();
       if (!partId) return;
       const part = manifest.parts.find((candidate) => candidate.partId === partId);
       if (!part) return;
@@ -173,7 +190,10 @@ export function mountAssemblyTree(
             : '未加载';
       const statusNode = row.querySelector<HTMLElement>('.module-status');
       if (statusNode) statusNode.textContent = label;
-      row.setAttribute('aria-label', `${row.textContent ?? moduleId}，${label}${error ? `：${error}` : ''}`);
+      const module = manifest.modules.find((candidate) => candidate.moduleId === moduleId);
+      const accessibleLabel = `${module?.nameZh ?? moduleId}，${module?.nameEn ?? ''}，${label}${error ? `：${error}` : ''}`;
+      row.setAttribute('aria-label', accessibleLabel);
+      row.querySelector('summary')?.setAttribute('aria-label', accessibleLabel);
     },
     setLoadProgress(loaded, total) {
       progress.textContent = `${loaded} / ${total}`;

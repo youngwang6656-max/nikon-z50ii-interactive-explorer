@@ -3,11 +3,12 @@ import { createAssemblyState, type AssemblyState } from '../domain/assemblyState
 import { mountAssemblyTree, type AssemblyTreeController } from '../ui/assemblyTree';
 import { mountAppShell, type AppShell } from '../ui/appShell';
 import { mountInspector, type InspectorController } from '../ui/inspector';
+import { handleSelectionShortcut } from '../ui/keyboardShortcuts';
 import { createViewer, type Viewer } from '../viewer/createRenderer';
 import { disposeObjectTree } from '../viewer/disposeObjectTree';
 import { ModuleLoader, type LoadedModule } from '../viewer/moduleLoader';
+import { PartDisplayController } from '../viewer/partDisplayController';
 import { SelectionController } from '../viewer/selectionController';
-import { Material, Mesh, Object3D } from 'three';
 
 export interface App {
   readonly manifest: AssemblyManifest;
@@ -67,66 +68,14 @@ export async function createApp(
 
   const mountedModuleIds = new Set<string>();
   const moduleMountPromises = new Map<string, Promise<void>>();
-  const hiddenPartIds = new Set<string>();
-  const transparentPartIds = new Set<string>();
-  let isolatedPartId: string | null = null;
-  const materialState = new Map<Material, {
-    opacity: number;
-    transparent: boolean;
-    depthWrite: boolean;
-  }>();
+  const displayController = viewer.partIndex
+    ? new PartDisplayController(viewer.partIndex)
+    : null;
 
   let assemblyTree: AssemblyTreeController | null = null;
   let inspector: InspectorController | null = null;
   let selectionController: SelectionController | null = null;
   let selectionRequest = 0;
-
-  const visitPartObjects = (root: Object3D, visitor: (object: Object3D) => void): void => {
-    visitor(root);
-    for (const child of root.children) {
-      if (child !== root && typeof child.userData.partId === 'string') continue;
-      visitPartObjects(child, visitor);
-    }
-  };
-
-  const applyDisplayState = (): void => {
-    for (const [partId, root] of viewer.partIndex) {
-      const visible = !hiddenPartIds.has(partId) && (!isolatedPartId || isolatedPartId === partId);
-      visitPartObjects(root, (object) => {
-        if (object instanceof Mesh) object.visible = visible;
-      });
-    }
-    for (const [material, state] of materialState) {
-      material.opacity = state.opacity;
-      material.transparent = state.transparent;
-      material.depthWrite = state.depthWrite;
-      material.needsUpdate = true;
-    }
-    for (const partId of transparentPartIds) {
-      const root = viewer.partIndex.get(partId);
-      if (!root) continue;
-      visitPartObjects(root, (object) => {
-        if (!(object instanceof Mesh)) return;
-        const materials = Array.isArray(object.material) ? object.material : [object.material];
-        for (const material of materials) {
-          if (!materialState.has(material)) {
-            materialState.set(material, {
-              opacity: material.opacity,
-              transparent: material.transparent,
-              depthWrite: material.depthWrite,
-            });
-          }
-          material.transparent = true;
-          material.opacity = Math.min(material.opacity, 0.24);
-          material.depthWrite = false;
-          material.needsUpdate = true;
-        }
-      });
-    }
-    if (selectionController?.selectedPartId) {
-      selectionController.select(selectionController.selectedPartId);
-    }
-  };
 
   const setModuleStatus = (
     moduleId: string,
@@ -143,7 +92,7 @@ export async function createApp(
       viewer.addModule(loaded);
       mountedModuleIds.add(loaded.moduleId);
       assemblyTree?.setLoadProgress(mountedModuleIds.size, manifest.modules.length);
-      applyDisplayState();
+      displayController?.apply();
     } catch (error) {
       disposeObjectTree(loaded.root);
       throw error;
@@ -184,11 +133,9 @@ export async function createApp(
   const updateSelectionUi = (partId: string | null): void => {
     assemblyTree?.select(partId);
     inspector?.select(partId);
-    inspector?.setActionState({
-      hidden: partId ? hiddenPartIds.has(partId) : false,
-      isolated: partId === isolatedPartId,
-      transparent: partId ? transparentPartIds.has(partId) : false,
-    });
+    inspector?.setActionState(partId && displayController
+      ? displayController.getState(partId)
+      : { hidden: false, isolated: false, transparent: false });
   };
 
   const selectTreePart = async (partId: string): Promise<void> => {
@@ -238,43 +185,36 @@ export async function createApp(
     inspector = mountInspector(shell.inspectorPanel, manifest, assemblyState, {
       onFocus: (partId) => { selectionController?.focus(partId); },
       onHide: (partId) => {
-        if (hiddenPartIds.has(partId)) hiddenPartIds.delete(partId);
-        else hiddenPartIds.add(partId);
-        applyDisplayState();
+        displayController?.toggleHidden(partId);
+        selectionController?.select(partId);
         updateSelectionUi(partId);
       },
       onIsolate: (partId) => {
-        isolatedPartId = isolatedPartId === partId ? null : partId;
-        applyDisplayState();
+        displayController?.toggleIsolation(partId);
+        selectionController?.select(partId);
         updateSelectionUi(partId);
       },
       onTransparency: (partId) => {
-        if (transparentPartIds.has(partId)) transparentPartIds.delete(partId);
-        else transparentPartIds.add(partId);
-        applyDisplayState();
+        displayController?.toggleTransparency(partId);
         updateSelectionUi(partId);
       },
       onResetSelection: () => { selectionController?.select(null); },
     });
     selectionController.onSelectionChange((partId) => {
       selectionRequest += 1;
+      displayController?.reconcileSelection(partId);
+      selectionController?.select(partId);
       updateSelectionUi(partId);
     });
     assemblyTree.setLoadProgress(0, manifest.modules.length);
   }
 
   const handleKeyDown = (event: KeyboardEvent): void => {
-    const target = event.target;
-    const editing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement ||
-      (target instanceof HTMLElement && target.isContentEditable);
-    if (editing) return;
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      selectionController?.select(null);
-    } else if (event.key === '/') {
-      event.preventDefault();
-      assemblyTree?.focusSearch();
-    }
+    handleSelectionShortcut(
+      event,
+      () => selectionController?.select(null),
+      () => assemblyTree?.focusSearch(),
+    );
   };
   if (selectionController) document.addEventListener('keydown', handleKeyDown);
 
@@ -307,13 +247,7 @@ export async function createApp(
       selectionController?.dispose();
       assemblyTree?.dispose();
       inspector?.dispose();
-      for (const [material, state] of materialState) {
-        material.opacity = state.opacity;
-        material.transparent = state.transparent;
-        material.depthWrite = state.depthWrite;
-        material.needsUpdate = true;
-      }
-      materialState.clear();
+      displayController?.dispose();
       moduleLoader.dispose();
       viewer.dispose();
       shell.dispose();

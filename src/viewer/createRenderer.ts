@@ -10,6 +10,8 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   PMREMGenerator,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
   Scene,
   ShadowMaterial,
   SRGBColorSpace,
@@ -28,6 +30,30 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import type { LoadedModule } from './moduleLoader';
 import { disposeObjectTree } from './disposeObjectTree';
 import { ModuleMountRegistry } from './moduleMountRegistry';
+
+export function calibrateInspectionMaterials(root: Object3D): void {
+  const calibrated = new Set<MeshStandardMaterial>();
+  root.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      if (!(material instanceof MeshStandardMaterial) || calibrated.has(material)) continue;
+      if (material.userData.materialRole !== 'sensor_glass' && material.name !== 'sensor_glass') continue;
+      calibrated.add(material);
+      material.color.setHex(0x082c36);
+      material.metalness = 0;
+      material.roughness = Math.max(material.roughness, 0.7);
+      material.envMapIntensity = 0;
+      if (material instanceof MeshPhysicalMaterial) {
+        material.clearcoat = 0;
+        material.transmission = 0;
+        material.specularIntensity = 0;
+        material.iridescence = 0;
+      }
+      material.needsUpdate = true;
+    }
+  });
+}
 
 export interface Viewer {
   readonly renderer: WebGLRenderer;
@@ -173,6 +199,7 @@ export function createViewer(container: HTMLElement): Viewer {
 
   const addModule = (module: LoadedModule): void => {
     if (disposed) throw new Error('Cannot add a module to a disposed viewer');
+    calibrateInspectionMaterials(module.root);
     moduleRegistry.add(module);
   };
 

@@ -9,9 +9,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { SelectionController } from '../../src/viewer/selectionController';
 
-function canvasStub(): HTMLCanvasElement {
+interface CanvasHarness {
+  canvas: HTMLCanvasElement;
+  dispatch(type: string, event: Partial<PointerEvent>): void;
+  setPointerCapture: ReturnType<typeof vi.fn>;
+  releasePointerCapture: ReturnType<typeof vi.fn>;
+}
+
+function canvasHarness(): CanvasHarness {
   const listeners = new Map<string, Set<EventListener>>();
-  return {
+  const setPointerCapture = vi.fn();
+  const releasePointerCapture = vi.fn();
+  const canvas = {
     addEventListener(type: string, listener: EventListener) {
       const handlers = listeners.get(type) ?? new Set<EventListener>();
       handlers.add(listener);
@@ -20,6 +29,8 @@ function canvasStub(): HTMLCanvasElement {
     removeEventListener(type: string, listener: EventListener) {
       listeners.get(type)?.delete(listener);
     },
+    setPointerCapture,
+    releasePointerCapture,
     getBoundingClientRect: () => ({
       left: 10,
       top: 20,
@@ -32,6 +43,24 @@ function canvasStub(): HTMLCanvasElement {
       toJSON: () => ({}),
     }),
   } as unknown as HTMLCanvasElement;
+  return {
+    canvas,
+    setPointerCapture,
+    releasePointerCapture,
+    dispatch(type, event) {
+      listeners.get(type)?.forEach((listener) => listener({
+        button: 0,
+        pointerId: 1,
+        clientX: 20,
+        clientY: 30,
+        ...event,
+      } as PointerEvent));
+    },
+  };
+}
+
+function canvasStub(): HTMLCanvasElement {
+  return canvasHarness().canvas;
 }
 
 function part(partId: string): { root: Group; mesh: Mesh } {
@@ -135,7 +164,54 @@ describe('SelectionController', () => {
     controller.dispose();
     controller.dispose();
 
-    expect(remove).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenCalledTimes(5);
     expect(outlinePass.selectedObjects).toEqual([]);
+  });
+
+  it('does not pick after a looped drag whose endpoint returns near its origin', () => {
+    const harness = canvasHarness();
+    const selected = part('selected');
+    const outlinePass = { selectedObjects: [] as Object3D[] };
+    const intersect = vi.fn(() => [{ object: selected.mesh, distance: 1 }]);
+    const controller = new SelectionController({
+      canvas: harness.canvas,
+      camera: new PerspectiveCamera(),
+      assemblyRoot: selected.root,
+      outlinePass,
+      partIndex: new Map([['selected', selected.root]]),
+      intersect,
+    });
+
+    harness.dispatch('pointerdown', { pointerId: 7, clientX: 20, clientY: 30 });
+    harness.dispatch('pointermove', { pointerId: 7, clientX: 80, clientY: 90 });
+    harness.dispatch('pointermove', { pointerId: 8, clientX: 20, clientY: 30 });
+    harness.dispatch('pointerup', { pointerId: 7, clientX: 21, clientY: 31 });
+
+    expect(intersect).not.toHaveBeenCalled();
+    expect(controller.selectedPartId).toBeNull();
+    expect(harness.setPointerCapture).toHaveBeenCalledWith(7);
+    expect(harness.releasePointerCapture).toHaveBeenCalledWith(7);
+  });
+
+  it('cancels an active pointer without picking and ignores other pointers', () => {
+    const harness = canvasHarness();
+    const intersect = vi.fn(() => []);
+    const controller = new SelectionController({
+      canvas: harness.canvas,
+      camera: new PerspectiveCamera(),
+      assemblyRoot: new Group(),
+      outlinePass: { selectedObjects: [] },
+      partIndex: new Map(),
+      intersect,
+    });
+
+    harness.dispatch('pointerdown', { pointerId: 4 });
+    harness.dispatch('pointerdown', { pointerId: 5 });
+    harness.dispatch('pointercancel', { pointerId: 4 });
+    harness.dispatch('pointerup', { pointerId: 4 });
+
+    expect(intersect).not.toHaveBeenCalled();
+    expect(harness.setPointerCapture).toHaveBeenCalledTimes(1);
+    controller.dispose();
   });
 });

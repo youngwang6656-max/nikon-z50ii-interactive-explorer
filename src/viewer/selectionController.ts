@@ -39,6 +39,13 @@ export interface SelectionControllerOptions {
 
 type SelectionListener = (partId: string | null) => void;
 
+interface ActivePointer {
+  pointerId: number;
+  originX: number;
+  originY: number;
+  maxMovement: number;
+}
+
 function isEffectivelyVisible(object: Object3D, boundary: Object3D): boolean {
   let current: Object3D | null = object;
   while (current) {
@@ -71,7 +78,7 @@ export class SelectionController {
   private readonly pointer = new Vector2();
   private readonly intersect: NonNullable<SelectionControllerOptions['intersect']>;
   private readonly listeners = new Set<SelectionListener>();
-  private pointerOrigin: { x: number; y: number } | null = null;
+  private activePointer: ActivePointer | null = null;
   private disposed = false;
   selectedPartId: string | null = null;
 
@@ -88,7 +95,10 @@ export class SelectionController {
         raycaster.intersectObject(assemblyRoot, true));
 
     this.canvas.addEventListener('pointerdown', this.handlePointerDown);
+    this.canvas.addEventListener('pointermove', this.handlePointerMove);
     this.canvas.addEventListener('pointerup', this.handlePointerUp);
+    this.canvas.addEventListener('pointercancel', this.handlePointerCancel);
+    this.canvas.addEventListener('lostpointercapture', this.handleLostPointerCapture);
   }
 
   onSelectionChange(listener: SelectionListener): () => void {
@@ -164,21 +174,68 @@ export class SelectionController {
     if (this.disposed) return;
     this.disposed = true;
     this.canvas.removeEventListener('pointerdown', this.handlePointerDown);
+    this.canvas.removeEventListener('pointermove', this.handlePointerMove);
     this.canvas.removeEventListener('pointerup', this.handlePointerUp);
+    this.canvas.removeEventListener('pointercancel', this.handlePointerCancel);
+    this.canvas.removeEventListener('lostpointercapture', this.handleLostPointerCapture);
+    this.releaseActivePointer();
     this.outlinePass.selectedObjects.splice(0);
     this.listeners.clear();
   }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
-    if (event.button !== 0) return;
-    this.pointerOrigin = { x: event.clientX, y: event.clientY };
+    if (event.button !== 0 || event.isPrimary === false || this.activePointer) return;
+    this.activePointer = {
+      pointerId: event.pointerId,
+      originX: event.clientX,
+      originY: event.clientY,
+      maxMovement: 0,
+    };
+    try {
+      this.canvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Some synthetic events and detached canvases cannot capture a pointer.
+    }
+  };
+
+  private readonly handlePointerMove = (event: PointerEvent): void => {
+    const active = this.activePointer;
+    if (!active || event.pointerId !== active.pointerId) return;
+    active.maxMovement = Math.max(
+      active.maxMovement,
+      Math.hypot(event.clientX - active.originX, event.clientY - active.originY),
+    );
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
-    const origin = this.pointerOrigin;
-    this.pointerOrigin = null;
-    if (!origin || event.button !== 0) return;
-    if (Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 5) return;
+    const active = this.activePointer;
+    if (!active || event.pointerId !== active.pointerId || event.button !== 0) return;
+    active.maxMovement = Math.max(
+      active.maxMovement,
+      Math.hypot(event.clientX - active.originX, event.clientY - active.originY),
+    );
+    this.releaseActivePointer();
+    if (active.maxMovement > 5) return;
     this.pick(event.clientX, event.clientY);
   };
+
+  private readonly handlePointerCancel = (event: PointerEvent): void => {
+    if (event.pointerId !== this.activePointer?.pointerId) return;
+    this.releaseActivePointer();
+  };
+
+  private readonly handleLostPointerCapture = (event: PointerEvent): void => {
+    if (event.pointerId === this.activePointer?.pointerId) this.activePointer = null;
+  };
+
+  private releaseActivePointer(): void {
+    const active = this.activePointer;
+    this.activePointer = null;
+    if (!active) return;
+    try {
+      this.canvas.releasePointerCapture(active.pointerId);
+    } catch {
+      // Capture may already be released by the browser during cancellation.
+    }
+  }
 }
