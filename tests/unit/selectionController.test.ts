@@ -243,4 +243,38 @@ describe('SelectionController', () => {
     expect(intersect).toHaveBeenCalledTimes(1);
     expect(controller.selectedPartId).toBe('selected');
   });
+
+  it.each(['pointerup', 'pointercancel'])(
+    'invalidates a click after a secondary right-button %s and preserves standalone right-click',
+    (endEvent) => {
+      const harness = canvasHarness();
+      const selected = part('selected');
+      const intersect = vi.fn(() => [{ object: selected.mesh, distance: 1 }]);
+      const controller = new SelectionController({
+        canvas: harness.canvas,
+        camera: new PerspectiveCamera(),
+        assemblyRoot: selected.root,
+        outlinePass: { selectedObjects: [] },
+        partIndex: new Map([['selected', selected.root]]),
+        intersect,
+      });
+
+      harness.dispatch('pointerdown', { pointerId: 1, button: 0, isPrimary: true });
+      harness.dispatch('pointerdown', { pointerId: 2, button: 2, isPrimary: false });
+      harness.dispatch(endEvent, { pointerId: 2, button: 2, isPrimary: false });
+      harness.dispatch('pointerup', { pointerId: 1, button: 0, isPrimary: true });
+
+      expect(intersect).not.toHaveBeenCalled();
+
+      harness.dispatch('pointerdown', { pointerId: 3, button: 0, isPrimary: true });
+      harness.dispatch('pointerup', { pointerId: 3, button: 0, isPrimary: true });
+      expect(intersect).toHaveBeenCalledTimes(1);
+
+      const capturedClickPointers = harness.setPointerCapture.mock.calls.length;
+      harness.dispatch('pointerdown', { pointerId: 4, button: 2, isPrimary: true });
+      harness.dispatch('pointerup', { pointerId: 4, button: 2, isPrimary: true });
+      expect(harness.setPointerCapture).toHaveBeenCalledTimes(capturedClickPointers);
+      expect(intersect).toHaveBeenCalledTimes(1);
+    },
+  );
 });

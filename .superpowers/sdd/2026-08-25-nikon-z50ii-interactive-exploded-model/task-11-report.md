@@ -165,3 +165,18 @@ The first repository wrapper invocation failed before tests because bundled `pnp
 - Focused pointer suite: **7 / 7 passed**.
 - Full check: ten suites, **48 / 48 passed**, followed by `tsc --noEmit` and the production Vite build.
 - Existing Vite main-chunk size warning remains the only build concern and predates this fix round.
+
+## Fix Round 3 (reviewed commit `d0b364c`)
+
+### Non-left secondary-pointer invalidation
+
+- Added the exact primary-left plus secondary-right/barrel regression for both `pointerup` and `pointercancel` endings. Before implementation, each variant reached the intersection/pick path once.
+- Reordered `pointerdown` handling so an already-active click gesture records, captures, and invalidates on any additional pointer before applying the primary/left candidate filter. The additional pointer's button value no longer lets it bypass gesture invalidation.
+- A click candidate can still begin only from a single primary left-button pointer. A standalone right-click remains outside selection tracking, is not captured, is not picked, and is not `preventDefault`-consumed, preserving OrbitControls right-button behavior.
+- Both invalidated variants recover after all pointers end: the next clean primary-left click picks exactly once.
+
+### Verification
+
+- Focused pointer suite: **9 / 9 passed**.
+- Full check: ten suites, **50 / 50 passed**, followed by `tsc --noEmit` and the production Vite build.
+- The pre-existing Vite main-chunk size warning remains unchanged.

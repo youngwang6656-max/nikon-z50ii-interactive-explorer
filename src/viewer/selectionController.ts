@@ -190,14 +190,15 @@ export class SelectionController {
   }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
-    if (event.button !== 0) return;
-    const additionalPointer = this.pointerIds.size > 0 || event.isPrimary === false;
-    this.pointerIds.add(event.pointerId);
-    this.capturePointer(event.pointerId);
-    if (additionalPointer) {
+    if (this.pointerIds.size > 0) {
+      this.pointerIds.add(event.pointerId);
+      this.capturePointer(event.pointerId);
       this.gestureInvalidated = true;
       return;
     }
+    if (event.button !== 0 || event.isPrimary === false) return;
+    this.pointerIds.add(event.pointerId);
+    this.capturePointer(event.pointerId);
     this.activePointer = {
       pointerId: event.pointerId,
       originX: event.clientX,
