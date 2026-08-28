@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+from hashlib import sha256
 import json
+import os
 from pathlib import Path
+import struct
 import sys
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 import bpy
 
@@ -20,6 +24,7 @@ from z50ii.constants import MM, MODULE_COLLECTIONS
 
 
 MODEL_ROOT = ROOT / "public" / "assets" / "models"
+TEXTURE_ROOT = ROOT / "public" / "assets" / "textures"
 MANIFEST_PATH = ROOT / "public" / "assembly-manifest.json"
 DISPLAY_PROPERTY_KEYS = ("nameZh", "nameEn", "descriptionZh", "descriptionEn")
 PROTECTED_LOW_DETAIL_TOKENS = (
@@ -94,36 +99,91 @@ def is_low_detail_protected(obj: bpy.types.Object) -> bool:
     return any(token in name for token in PROTECTED_LOW_DETAIL_TOKENS for name in names)
 
 
-def duplicate_module_scene(module_id: str, quality: str) -> tuple[bpy.types.Scene, list[bpy.types.Object]]:
+def source_owner_id(obj: bpy.types.Object) -> str | None:
+    current = obj
+    while current is not None:
+        if current.get("partId"):
+            return str(current["partId"])
+        if current.get("attachedPartId"):
+            return str(current["attachedPartId"])
+        current = current.parent
+    return None
+
+
+def module_source_objects(module_id: str) -> list[bpy.types.Object]:
     source_collection = bpy.data.collections[module_id]
-    export_scene = bpy.data.scenes.new(f"EXPORT_{quality}_{module_id}")
-    export_collection = bpy.data.collections.new(f"EXPORT_COLLECTION_{quality}_{module_id}")
-    export_scene.collection.children.link(export_collection)
+    module_part_ids = {
+        str(obj["partId"])
+        for obj in source_collection.all_objects
+        if obj.get("partId") and str(obj.get("moduleId")) == module_id
+    }
+    owned = {
+        obj
+        for obj in bpy.data.objects
+        if source_owner_id(obj) in module_part_ids
+    }
+    owned.update(source_collection.all_objects)
+    return sorted(owned, key=lambda obj: obj.name)
 
-    copies: dict[bpy.types.Object, bpy.types.Object] = {}
-    for source in source_collection.all_objects:
-        duplicate = source.copy()
-        if source.type == "MESH" and source.data is not None:
-            duplicate.data = source.data.copy()
-        export_collection.objects.link(duplicate)
-        copies[source] = duplicate
 
-    for source, duplicate in copies.items():
-        if source.parent in copies:
-            duplicate.parent = copies[source.parent]
-            duplicate.matrix_parent_inverse = source.matrix_parent_inverse.copy()
-            duplicate.matrix_local = source.matrix_local.copy()
-        else:
-            duplicate.parent = None
-            duplicate.matrix_world = source.matrix_world.copy()
+def remove_export_scene(
+    scene: bpy.types.Scene | None,
+    objects: list[bpy.types.Object],
+    collections: list[bpy.types.Collection],
+) -> None:
+    meshes = {obj.data for obj in objects if obj.type == "MESH" and obj.data is not None}
+    if scene is not None and scene.name in bpy.data.scenes:
+        bpy.data.scenes.remove(scene)
+    for obj in objects:
+        if obj.name in bpy.data.objects:
+            bpy.data.objects.remove(obj, do_unlink=True)
+    for mesh in meshes:
+        if mesh.users == 0:
+            bpy.data.meshes.remove(mesh)
+    for collection in collections:
+        if collection.name in bpy.data.collections and collection.users == 0:
+            bpy.data.collections.remove(collection)
 
-        for key in DISPLAY_PROPERTY_KEYS:
-            if key in duplicate:
-                del duplicate[key]
 
+@contextmanager
+def temporary_module_scene(
+    module_id: str, quality: str
+) -> Iterator[tuple[bpy.types.Scene, list[bpy.types.Object]]]:
     previous_scene = bpy.context.window.scene
-    bpy.context.window.scene = export_scene
+    export_scene: bpy.types.Scene | None = None
+    export_collections: list[bpy.types.Collection] = []
+    duplicates: list[bpy.types.Object] = []
     try:
+        export_scene = bpy.data.scenes.new(f"EXPORT_{quality}_{module_id}")
+        export_collection = bpy.data.collections.new(f"EXPORT_COLLECTION_{quality}_{module_id}")
+        export_collections.append(export_collection)
+        export_scene.collection.children.link(export_collection)
+
+        copies: dict[bpy.types.Object, bpy.types.Object] = {}
+        for source in module_source_objects(module_id):
+            if source.type not in {"MESH", "EMPTY"}:
+                raise TypeError(f"unsupported module object type {source.type}: {source.name}")
+            duplicate = source.copy()
+            duplicates.append(duplicate)
+            if source.type == "MESH" and source.data is not None:
+                duplicate.data = source.data.copy()
+            export_collection.objects.link(duplicate)
+            copies[source] = duplicate
+
+        for source, duplicate in copies.items():
+            if source.parent in copies:
+                duplicate.parent = copies[source.parent]
+                duplicate.matrix_parent_inverse = source.matrix_parent_inverse.copy()
+                duplicate.matrix_local = source.matrix_local.copy()
+            else:
+                duplicate.parent = None
+                duplicate.matrix_world = source.matrix_world.copy()
+
+            for key in DISPLAY_PROPERTY_KEYS:
+                if key in duplicate:
+                    del duplicate[key]
+
+        bpy.context.window.scene = export_scene
         mesh_objects = [obj for obj in copies.values() if obj.type == "MESH"]
         bpy.ops.object.select_all(action="DESELECT")
         for obj in mesh_objects:
@@ -143,34 +203,127 @@ def duplicate_module_scene(module_id: str, quality: str) -> tuple[bpy.types.Scen
                     decimate = obj.modifiers.new(name="Z50II_LowDetailDecimate", type="DECIMATE")
                     decimate.ratio = 0.38
                     decimate.use_collapse_triangulate = True
+        yield export_scene, duplicates
     finally:
-        bpy.context.window.scene = previous_scene
+        if previous_scene.name in bpy.data.scenes:
+            bpy.context.window.scene = previous_scene
+        remove_export_scene(export_scene, duplicates, export_collections)
 
-    return export_scene, list(copies.values())
+
+def read_glb(path: Path) -> tuple[dict[str, Any], bytes]:
+    payload = path.read_bytes()
+    magic, version, total_length = struct.unpack_from("<4sII", payload, 0)
+    assert magic == b"glTF" and version == 2 and total_length == len(payload)
+    json_length, json_type = struct.unpack_from("<I4s", payload, 12)
+    assert json_type == b"JSON"
+    json_start = 20
+    document = json.loads(payload[json_start : json_start + json_length].decode("utf-8"))
+    binary_header = json_start + json_length
+    binary_length, binary_type = struct.unpack_from("<I4s", payload, binary_header)
+    assert binary_type == b"BIN\x00"
+    binary_start = binary_header + 8
+    return document, payload[binary_start : binary_start + binary_length]
 
 
-def remove_export_scene(scene: bpy.types.Scene, objects: list[bpy.types.Object]) -> None:
-    collections = list(scene.collection.children)
-    meshes = {obj.data for obj in objects if obj.type == "MESH" and obj.data is not None}
-    bpy.data.scenes.remove(scene)
-    for obj in objects:
-        if obj.name in bpy.data.objects:
-            bpy.data.objects.remove(obj, do_unlink=True)
-    for mesh in meshes:
-        if mesh.users == 0:
-            bpy.data.meshes.remove(mesh)
-    for collection in collections:
-        if collection.users == 0:
-            bpy.data.collections.remove(collection)
+def texture_candidates_by_hash() -> dict[str, list[Path]]:
+    result: dict[str, list[Path]] = {}
+    for path in sorted(TEXTURE_ROOT.iterdir()):
+        if path.is_file() and path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
+            result.setdefault(sha256(path.read_bytes()).hexdigest(), []).append(path)
+    return result
+
+
+def remap_buffer_view_references(document: dict[str, Any], mapping: dict[int, int]) -> None:
+    for accessor in document.get("accessors", []):
+        if "bufferView" in accessor:
+            accessor["bufferView"] = mapping[int(accessor["bufferView"])]
+        sparse = accessor.get("sparse")
+        if sparse:
+            sparse["indices"]["bufferView"] = mapping[int(sparse["indices"]["bufferView"])]
+            sparse["values"]["bufferView"] = mapping[int(sparse["values"]["bufferView"])]
+    for mesh in document.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            draco = primitive.get("extensions", {}).get("KHR_draco_mesh_compression")
+            if draco:
+                draco["bufferView"] = mapping[int(draco["bufferView"])]
+
+
+def write_glb(path: Path, document: dict[str, Any], binary: bytes) -> None:
+    json_payload = json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    json_payload += b" " * ((-len(json_payload)) % 4)
+    binary_payload = binary + b"\x00" * ((-len(binary)) % 4)
+    total_length = 12 + 8 + len(json_payload) + 8 + len(binary_payload)
+    path.write_bytes(
+        struct.pack("<4sII", b"glTF", 2, total_length)
+        + struct.pack("<I4s", len(json_payload), b"JSON")
+        + json_payload
+        + struct.pack("<I4s", len(binary_payload), b"BIN\x00")
+        + binary_payload
+    )
+
+
+def externalize_shared_textures(path: Path) -> dict[str, int]:
+    document, binary = read_glb(path)
+    image_views = {
+        int(image["bufferView"])
+        for image in document.get("images", [])
+        if "bufferView" in image
+    }
+    if not image_views:
+        return {"imageReferences": len(document.get("images", [])), "externalImageBytes": 0}
+
+    old_views = document["bufferViews"]
+    candidates = texture_candidates_by_hash()
+    external_bytes: set[Path] = set()
+    for image in document.get("images", []):
+        old_index = int(image.pop("bufferView"))
+        view = old_views[old_index]
+        start = int(view.get("byteOffset", 0))
+        payload = binary[start : start + int(view["byteLength"])]
+        digest = sha256(payload).hexdigest()
+        matches = candidates.get(digest, [])
+        preferred = next((candidate for candidate in matches if candidate.stem == image.get("name")), None)
+        if preferred is None and matches:
+            preferred = matches[0]
+        if preferred is None:
+            extension = {"image/png": ".png", "image/jpeg": ".jpg"}[image["mimeType"]]
+            preferred = TEXTURE_ROOT / f"glb-{digest[:16]}{extension}"
+            if not preferred.exists():
+                preferred.write_bytes(payload)
+            candidates.setdefault(digest, []).append(preferred)
+        image["uri"] = Path(os.path.relpath(preferred, path.parent)).as_posix()
+        external_bytes.add(preferred)
+
+    new_binary = bytearray()
+    new_views: list[dict[str, Any]] = []
+    mapping: dict[int, int] = {}
+    for old_index, old_view in enumerate(old_views):
+        if old_index in image_views:
+            continue
+        while len(new_binary) % 4:
+            new_binary.append(0)
+        start = int(old_view.get("byteOffset", 0))
+        length = int(old_view["byteLength"])
+        new_view = dict(old_view)
+        new_view["byteOffset"] = len(new_binary)
+        mapping[old_index] = len(new_views)
+        new_views.append(new_view)
+        new_binary.extend(binary[start : start + length])
+
+    document["bufferViews"] = new_views
+    document["buffers"][0]["byteLength"] = len(new_binary)
+    remap_buffer_view_references(document, mapping)
+    write_glb(path, document, bytes(new_binary))
+    return {
+        "imageReferences": len(document.get("images", [])),
+        "externalImageBytes": sum(texture.stat().st_size for texture in external_bytes),
+    }
 
 
 def export_module(module_id: str, quality: str) -> dict[str, Any]:
     output_path = MODEL_ROOT / quality / f"{module_id}.glb"
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    export_scene, objects = duplicate_module_scene(module_id, quality)
-    previous_scene = bpy.context.window.scene
-    try:
-        bpy.context.window.scene = export_scene
+    with temporary_module_scene(module_id, quality) as (export_scene, objects):
         before_triangles = sum(
             evaluated_triangle_count(obj, export_scene) for obj in objects if obj.type == "MESH"
         )
@@ -196,15 +349,14 @@ def export_module(module_id: str, quality: str) -> dict[str, Any]:
         )
         assert result == {"FINISHED"}, f"glTF export failed for {quality}/{module_id}: {result}"
         assert output_path.is_file() and output_path.stat().st_size > 0
+        texture_record = externalize_shared_textures(output_path)
         return {
             "moduleId": module_id,
             "quality": quality,
             "bytes": output_path.stat().st_size,
             "evaluatedTriangles": before_triangles,
+            **texture_record,
         }
-    finally:
-        bpy.context.window.scene = previous_scene
-        remove_export_scene(export_scene, objects)
 
 
 def part_manifest(obj: bpy.types.Object) -> dict[str, Any]:
