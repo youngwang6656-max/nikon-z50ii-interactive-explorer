@@ -5,6 +5,8 @@ export type ShellModuleStatus = 'idle' | 'loading' | 'ready' | 'failed';
 export interface AppShell {
   readonly root: HTMLElement;
   readonly viewerHost: HTMLElement;
+  readonly assemblyPanel?: HTMLElement;
+  readonly inspectorPanel?: HTMLElement;
   setModuleStatus(moduleId: string, status: ShellModuleStatus, error?: string): void;
   dispose(): void;
 }
@@ -113,6 +115,7 @@ export function mountAppShell(
 
   const timeline = createElement('footer', 'timeline-panel');
   timeline.setAttribute('aria-labelledby', 'timeline-heading');
+  timeline.setAttribute('aria-label', '拆解序列与爆炸进度控制');
   const timelineHeading = createElement('div', 'timeline-heading');
   const timelineTitle = createElement('h2', 'timeline-title', '拆解序列');
   timelineTitle.id = 'timeline-heading';
@@ -132,6 +135,8 @@ export function mountAppShell(
   return {
     root,
     viewerHost,
+    assemblyPanel: assemblyTree,
+    inspectorPanel: inspector,
     setModuleStatus(moduleId, status, error) {
       const row = moduleList.querySelector<HTMLElement>(
         `[data-module-id="${CSS.escape(moduleId)}"]`,
