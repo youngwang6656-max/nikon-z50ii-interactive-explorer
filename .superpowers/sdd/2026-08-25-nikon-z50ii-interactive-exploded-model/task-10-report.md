@@ -169,3 +169,91 @@ The first smoke exposed only the browser's implicit `/favicon.ico` 404. An inlin
 
 - Vite reports the standard `>500 kB` minified chunk advisory for the Three.js plus postprocessing entry (about 703 kB minified / 179 kB gzip). This is non-blocking for Task 10 and does not affect decode/runtime correctness, but code-splitting can be considered in a later performance task.
 - Three 0.185.1's `DRACOLoader` source also contains import-relative decoder URL constants, so Vite emits additional hashed decoder artifacts even though the runtime explicitly uses the pinned `public/assets/draco/` files. The smoke trace confirms the public decoder path is the one requested.
+
+## Fix Round 1: Ownership and Transactional Indexing
+
+### Verified review findings
+
+The review findings reproduced against commit `dfb4dc9`:
+
+- A deferred fetch resolved after `ModuleLoader.dispose()` and returned a ready `LoadedModule`; its geometry, material, and texture emitted zero disposal events.
+- `retry()` after disposal changed the failed state to `idle`, cleared its error, and incremented retry count before `load()` threw.
+- A module 01 scene tagged with module 02's valid part ID resolved successfully because validation checked only duplicates and missing expected IDs.
+- Viewer insertion had no collision gate and mutated root metadata, assembly membership, module ownership, and the shared part index in sequence.
+- `createApp` had no dependency seam or preload completion handle, so the in-flight-disposal path could not be exercised without a real DOM/WebGL context.
+
+### Additional RED evidence
+
+The first fix-round loader run failed 2 of 12 tests for the expected reasons:
+
+```text
+promise resolved ... instead of rejecting
+expected failed/offline/retryCount 0, received idle/null/retryCount 1
+```
+
+The identity/registry RED run failed because `ModuleMountRegistry` did not exist and because the cross-module tagged scene resolved instead of rejecting. The create-app lifecycle RED run failed both tests at `document is not defined`, proving that the production-only dependencies were still coupled.
+
+### Implemented ownership model
+
+- Added `disposeObjectTree()`, which walks real Three meshes, discovers geometry/material/texture resources, and uses process-local weak sets to guarantee each owned resource is disposed at most once even if defensive cleanup paths overlap.
+- `ModuleLoader` now checks its disposed state when a fetch resolves. A late decoded scene is disposed and the pending promise rejects with its exact `moduleId:quality` key; the catch path does not mutate state after disposal.
+- Invalid decoded scenes (duplicates, unexpected IDs, or missing IDs) are also disposed before their rejected promise is cached.
+- `retry()` now checks loader liveness before reading or mutating failure state/cache.
+- `createApp` exposes `preloadReady`, supports injected manifest/shell/viewer/loader factories for lifecycle tests, and disposes a resolved-but-unattached root defensively if app disposal wins the ownership race.
+- If transactional viewer insertion rejects, `createApp` disposes the still-unowned root before surfacing module failure state.
+
+### Transactional module mounting
+
+- Added `ModuleMountRegistry` as the pure ownership/index boundary used by `createViewer`.
+- It validates every incoming part ID against the active global index before mutating root metadata, mesh shadow flags, assembly children, module ownership, or part mappings.
+- Same-module high/low replacement treats the current module's own mappings as replaceable, detaches the old root, and updates the shared index atomically.
+- Cross-module collisions reject before mutation; removing/replacing a module can no longer erase a mapping owned by another module.
+- All roots accepted during quality swaps stay owned until final teardown and are then disposed exactly once.
+
+### Fix-round regression coverage
+
+Focused lifecycle suites:
+
+```text
+Test Files 3 passed (3)
+Tests 17 passed (17)
+```
+
+They now cover:
+
+- deferred decode after loader/app disposal with geometry/material/texture disposal counts exactly equal to one;
+- no late root attachment after app disposal;
+- disposed retry state/call-count immutability;
+- strict rejection of another module's tagged part ID;
+- two-module part-index collision with no partial root/index/root-metadata mutation;
+- reversible same-module quality replacement and one-shot teardown;
+- repeated isolated `createApp` construction and disposal.
+
+Full final check:
+
+```text
+Test Files 5 passed (5)
+Tests 31 passed (31)
+tsc --noEmit: passed
+vite build: passed
+```
+
+### Root and nested-base runtime smoke
+
+Served the same final `dist` through a prefix-mapped static server and opened both `/` and `/offline/z50ii/` with the existing system Chrome in headless mode. Both routes produced:
+
+```text
+01_chassis_front: ready
+02_outer_shell_controls: ready
+03-08: idle
+required asset responses: 12 x HTTP 200
+failed requests: 0
+HTTP >= 400: 0
+console/page errors: 0
+```
+
+At the nested route, manifest, HDR, both GLBs, Draco WASM/wrapper, and every external texture were requested under `/offline/z50ii/`, verifying the relative Vite base behavior after the lifecycle changes.
+
+### Remaining concerns after fix round 1
+
+No new functional concerns. The two original non-blocking build observations remain: Vite's approximately 704 kB minified / 179 kB gzip main-chunk advisory and Three's additional hashed decoder artifacts alongside the explicitly used public decoder directory.

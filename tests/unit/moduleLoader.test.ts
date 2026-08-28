@@ -1,4 +1,11 @@
-import { Group, Mesh, Object3D } from 'three';
+import {
+  BufferGeometry,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  Object3D,
+  Texture,
+} from 'three';
 import { describe, expect, it, vi } from 'vitest';
 
 import fixture from '../fixtures/assembly-manifest.valid.json';
@@ -28,6 +35,31 @@ function successfulFetcher(): ModuleFetcher {
       ? sceneWithParts('Z50II-02-001')
       : sceneWithParts('Z50II-01-001'),
   }));
+}
+
+function trackedPartScene(partId: string): {
+  scene: Group;
+  disposeCounts: { geometry: number; material: number; texture: number };
+} {
+  const scene = new Group();
+  const part = new Group();
+  part.userData.partId = partId;
+  const geometry = new BufferGeometry();
+  const texture = new Texture();
+  const material = new MeshStandardMaterial({ map: texture });
+  const disposeCounts = { geometry: 0, material: 0, texture: 0 };
+  geometry.addEventListener('dispose', () => {
+    disposeCounts.geometry += 1;
+  });
+  material.addEventListener('dispose', () => {
+    disposeCounts.material += 1;
+  });
+  texture.addEventListener('dispose', () => {
+    disposeCounts.texture += 1;
+  });
+  part.add(new Mesh(geometry, material));
+  scene.add(part);
+  return { scene, disposeCounts };
 }
 
 describe('ModuleLoader', () => {
@@ -191,6 +223,16 @@ describe('ModuleLoader', () => {
     );
   });
 
+  it('rejects tagged parts that belong to another manifest module', async () => {
+    const scene = sceneWithParts('Z50II-01-001', 'Z50II-02-001');
+    const loader = new ModuleLoader(manifest, async () => ({ scene }));
+
+    await expect(loader.load('01_chassis_front', 'high')).rejects.toThrow(
+      '01_chassis_front contains unexpected parts: Z50II-02-001',
+    );
+    expect(loader.getState('01_chassis_front', 'high').status).toBe('failed');
+  });
+
   it('rejects unknown modules and runtime-invalid qualities before fetching', () => {
     const fetcher = successfulFetcher();
     const loader = new ModuleLoader(manifest, fetcher);
@@ -216,5 +258,43 @@ describe('ModuleLoader', () => {
     expect(() => loader.load('01_chassis_front', 'high')).toThrow(
       'ModuleLoader has been disposed',
     );
+  });
+
+  it('disposes a decoded scene exactly once when an in-flight load finishes after disposal', async () => {
+    let resolveFetch: ((value: { scene: Object3D }) => void) | undefined;
+    const fetcher = vi.fn(
+      () =>
+        new Promise<{ scene: Object3D }>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    const { scene, disposeCounts } = trackedPartScene('Z50II-01-001');
+    const loader = new ModuleLoader(manifest, fetcher);
+
+    const pending = loader.load('01_chassis_front', 'high');
+    loader.dispose();
+    resolveFetch?.({ scene });
+
+    await expect(pending).rejects.toThrow(
+      'ModuleLoader was disposed while loading 01_chassis_front:high',
+    );
+    expect(disposeCounts).toEqual({ geometry: 1, material: 1, texture: 1 });
+    loader.dispose();
+    expect(disposeCounts).toEqual({ geometry: 1, material: 1, texture: 1 });
+  });
+
+  it('rejects retry after disposal without changing the failed state', async () => {
+    const fetcher = vi.fn<ModuleFetcher>().mockRejectedValue(new Error('offline'));
+    const loader = new ModuleLoader(manifest, fetcher);
+    await expect(loader.load('01_chassis_front', 'low')).rejects.toThrow('offline');
+    const beforeDispose = loader.getState('01_chassis_front', 'low');
+
+    loader.dispose();
+
+    expect(() => loader.retry('01_chassis_front')).toThrow(
+      'ModuleLoader has been disposed',
+    );
+    expect(loader.getState('01_chassis_front', 'low')).toEqual(beforeDispose);
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });

@@ -7,6 +7,7 @@ import type {
   ModuleManifest,
   QualityLevel,
 } from '../domain/manifest';
+import { disposeObjectTree } from './disposeObjectTree';
 
 export type ModuleStatus = 'idle' | 'loading' | 'ready' | 'failed';
 
@@ -106,7 +107,7 @@ export class ModuleLoader {
   }
 
   load(moduleId: string, quality: QualityLevel): Promise<LoadedModule> {
-    if (this.disposed) throw new Error('ModuleLoader has been disposed');
+    this.requireActive();
     const module = this.requireModule(moduleId);
     this.requireQuality(quality);
     const key = moduleKey(moduleId, quality);
@@ -124,14 +125,36 @@ export class ModuleLoader {
 
     const promise = this.fetcher(module.urls[quality])
       .then(({ scene }) => {
-        const partIndex = indexParts(moduleId, scene);
-        const missingPartIds = (this.expectedPartIds.get(moduleId) ?? []).filter(
-          (partId) => !partIndex.has(partId),
-        );
-        if (missingPartIds.length > 0) {
+        if (this.disposed) {
+          disposeObjectTree(scene);
           throw new Error(
-            `${moduleId} is missing expected parts: ${missingPartIds.join(', ')}`,
+            `ModuleLoader was disposed while loading ${moduleId}:${quality}`,
           );
+        }
+        let partIndex: Map<string, Object3D>;
+        try {
+          partIndex = indexParts(moduleId, scene);
+          const expectedPartIds = this.expectedPartIds.get(moduleId) ?? [];
+          const expectedSet = new Set(expectedPartIds);
+          const unexpectedPartIds = [...partIndex.keys()].filter(
+            (partId) => !expectedSet.has(partId),
+          );
+          if (unexpectedPartIds.length > 0) {
+            throw new Error(
+              `${moduleId} contains unexpected parts: ${unexpectedPartIds.join(', ')}`,
+            );
+          }
+          const missingPartIds = expectedPartIds.filter(
+            (partId) => !partIndex.has(partId),
+          );
+          if (missingPartIds.length > 0) {
+            throw new Error(
+              `${moduleId} is missing expected parts: ${missingPartIds.join(', ')}`,
+            );
+          }
+        } catch (error) {
+          disposeObjectTree(scene);
+          throw error;
         }
 
         this.states.set(key, {
@@ -147,13 +170,15 @@ export class ModuleLoader {
         return { moduleId, quality, root: scene, partIndex };
       })
       .catch((error: unknown) => {
-        this.states.set(key, {
-          status: 'failed',
-          quality,
-          error: describeError(error),
-          retryCount: this.states.get(key)?.retryCount ?? 0,
-        });
-        this.lastFailedQuality.set(moduleId, quality);
+        if (!this.disposed) {
+          this.states.set(key, {
+            status: 'failed',
+            quality,
+            error: describeError(error),
+            retryCount: this.states.get(key)?.retryCount ?? 0,
+          });
+          this.lastFailedQuality.set(moduleId, quality);
+        }
         throw error;
       });
 
@@ -162,6 +187,7 @@ export class ModuleLoader {
   }
 
   retry(moduleId: string): Promise<LoadedModule> {
+    this.requireActive();
     this.requireModule(moduleId);
     const quality =
       this.lastFailedQuality.get(moduleId) ?? this.lastQuality.get(moduleId) ?? 'high';
@@ -216,6 +242,10 @@ export class ModuleLoader {
     const module = this.modules.get(moduleId);
     if (!module) throw new Error(`Unknown module: ${moduleId}`);
     return module;
+  }
+
+  private requireActive(): void {
+    if (this.disposed) throw new Error('ModuleLoader has been disposed');
   }
 
   private requireQuality(quality: string): asserts quality is QualityLevel {
