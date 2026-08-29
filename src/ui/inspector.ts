@@ -21,7 +21,11 @@ export interface InspectorCallbacks {
   onIsolate(partId: string): void;
   onTransparency(partId: string): void;
   onResetSelection(): void;
-  onProgressChange(partId: string, progress: number): void;
+  onProgressGesture(
+    partId: string,
+    progress: number,
+    phase: 'begin' | 'preview' | 'commit' | 'cancel',
+  ): void;
   onSelectDependency(partId: string): void;
   onUndoMove(): void;
   onResetAssembly(): void;
@@ -30,6 +34,8 @@ export interface InspectorCallbacks {
 export interface InspectorController {
   select(partId: string | null): void;
   updateAssemblyState(state: AssemblyState): void;
+  setFreeMode(enabled: boolean): void;
+  abortProgressGesture(): void;
   setActionState(state: { hidden: boolean; isolated: boolean; transparent: boolean }): void;
   dispose(): void;
 }
@@ -97,6 +103,13 @@ export function mountInspector(
   host.replaceChildren(root);
   let currentPartId: string | null = null;
   let currentAssemblyState = state;
+  let freeMode = false;
+  let activeProgressGesture: {
+    readonly partId: string;
+    readonly startProgress: number;
+    pointerId: number | null;
+    progress: number;
+  } | null = null;
 
   const updateProgressElements = (): void => {
     if (!currentPartId) return;
@@ -106,6 +119,7 @@ export function mountInspector(
     if (input) {
       input.value = String(Math.round(value * 1000));
       input.setAttribute('aria-valuetext', label);
+      input.disabled = !freeMode;
     }
     const live = content.querySelector<HTMLOutputElement>('[data-testid="part-progress-live"]');
     if (live) {
@@ -171,7 +185,6 @@ export function mountInspector(
     metrics.append(node('dt', '', '拆解步骤'), node('dd', '', String(model.step).padStart(2, '0')));
     const progressTerm = node('dt', '', '当前爆炸进度');
     const progressControl = node('dd', 'part-progress-control');
-    progressControl.dataset.testid = 'part-progress';
     progressControl.setAttribute('role', 'group');
     progressControl.setAttribute('aria-label', `${model.nameZh}拆解进度控制`);
     const progressInput = node('input', 'part-progress-range');
@@ -181,17 +194,14 @@ export function mountInspector(
     progressInput.step = '1';
     progressInput.value = String(Math.round(model.progressValue * 1000));
     progressInput.dataset.progressInput = 'true';
+    progressInput.dataset.testid = 'part-progress';
+    progressInput.disabled = !freeMode;
     progressInput.setAttribute('aria-label', `${model.nameZh}拆解进度`);
     progressInput.setAttribute('aria-valuetext', model.progressLabel);
     const progressLive = node('output', 'part-progress-live', model.progressLabel);
     progressLive.dataset.testid = 'part-progress-live';
     progressLive.setAttribute('aria-live', 'polite');
     progressControl.append(progressInput, progressLive);
-    Object.defineProperty(progressControl, 'value', {
-      configurable: true,
-      get: () => progressInput.value,
-      set: (value: unknown) => { progressInput.value = String(value); },
-    });
     metrics.append(progressTerm, progressControl);
     const dependencies = node('section', 'dependency-section');
     const dependencyTitle = node('h4', '', '前置依赖 / Dependencies');
@@ -249,15 +259,31 @@ export function mountInspector(
     else if (action === 'isolate') callbacks.onIsolate(currentPartId);
     else if (action === 'transparency') callbacks.onTransparency(currentPartId);
   };
-  const handleInput = (event: Event): void => {
-    const target = event.target instanceof Element ? event.target : null;
-    const control = target?.closest<HTMLElement>('[data-testid="part-progress"]') ?? null;
-    const input = target instanceof HTMLInputElement && target.dataset.progressInput === 'true'
+  const progressInputFrom = (target: EventTarget | null): HTMLInputElement | null =>
+    target instanceof HTMLInputElement && target.dataset.progressInput === 'true'
       ? target
-      : control?.querySelector<HTMLInputElement>('[data-progress-input="true"]') ?? null;
-    if (!input || !currentPartId) return;
-    callbacks.onProgressChange(currentPartId, Number(input.value) / 1000);
-    const label = `${Math.round(Number(input.value) / 10)}%`;
+      : null;
+  const beginProgressGesture = (input: HTMLInputElement, pointerId: number | null): void => {
+    if (!freeMode || !currentPartId || input.disabled || activeProgressGesture) return;
+    const startProgress = currentAssemblyState.progress[currentPartId] ?? 0;
+    activeProgressGesture = {
+      partId: currentPartId,
+      startProgress,
+      pointerId,
+      progress: startProgress,
+    };
+    callbacks.onProgressGesture(currentPartId, startProgress, 'begin');
+  };
+  const publishProgressPreview = (input: HTMLInputElement): void => {
+    if (!freeMode || !currentPartId || input.disabled) return;
+    beginProgressGesture(input, null);
+    const gesture = activeProgressGesture;
+    if (!gesture || gesture.partId !== currentPartId) return;
+    const requestedProgress = Number(input.value) / 1000;
+    callbacks.onProgressGesture(gesture.partId, requestedProgress, 'preview');
+    gesture.progress = currentAssemblyState.progress[gesture.partId] ?? requestedProgress;
+    input.value = String(Math.round(gesture.progress * 1000));
+    const label = `${Math.round(gesture.progress * 100)}%`;
     input.setAttribute('aria-valuetext', label);
     const live = content.querySelector<HTMLOutputElement>('[data-testid="part-progress-live"]');
     if (live) {
@@ -265,8 +291,68 @@ export function mountInspector(
       live.textContent = label;
     }
   };
+  const commitProgressGesture = (): void => {
+    const gesture = activeProgressGesture;
+    if (!gesture) return;
+    activeProgressGesture = null;
+    callbacks.onProgressGesture(gesture.partId, gesture.progress, 'commit');
+  };
+  const cancelProgressGesture = (): void => {
+    const gesture = activeProgressGesture;
+    if (!gesture) return;
+    activeProgressGesture = null;
+    callbacks.onProgressGesture(gesture.partId, gesture.startProgress, 'cancel');
+  };
+  const handleInput = (event: Event): void => {
+    const input = progressInputFrom(event.target);
+    if (input) publishProgressPreview(input);
+  };
+  const handleChange = (event: Event): void => {
+    if (progressInputFrom(event.target)) commitProgressGesture();
+  };
+  const handlePointerDown = (event: PointerEvent): void => {
+    const input = progressInputFrom(event.target);
+    if (input && event.button === 0 && event.isPrimary !== false) {
+      beginProgressGesture(input, event.pointerId);
+    }
+  };
+  const handlePointerUp = (event: PointerEvent): void => {
+    if (activeProgressGesture?.pointerId === event.pointerId) commitProgressGesture();
+  };
+  const handlePointerCancel = (event: PointerEvent): void => {
+    if (activeProgressGesture?.pointerId === event.pointerId) cancelProgressGesture();
+  };
+  const handleKeyDown = (event: KeyboardEvent): void => {
+    const input = progressInputFrom(event.target);
+    if (!input) return;
+    if (event.key === 'Escape' && activeProgressGesture) {
+      event.preventDefault();
+      event.stopPropagation();
+      cancelProgressGesture();
+      return;
+    }
+    if ([
+      'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+      'PageUp', 'PageDown', 'Home', 'End',
+    ].includes(event.key)) beginProgressGesture(input, null);
+  };
+  const handleKeyUp = (event: KeyboardEvent): void => {
+    if (progressInputFrom(event.target) && activeProgressGesture?.pointerId === null) {
+      commitProgressGesture();
+    }
+  };
+  const handleFocusOut = (event: FocusEvent): void => {
+    if (progressInputFrom(event.target)) commitProgressGesture();
+  };
   root.addEventListener('click', handleClick);
   root.addEventListener('input', handleInput);
+  root.addEventListener('change', handleChange);
+  root.addEventListener('pointerdown', handlePointerDown);
+  root.addEventListener('pointerup', handlePointerUp);
+  root.addEventListener('pointercancel', handlePointerCancel);
+  root.addEventListener('keydown', handleKeyDown);
+  root.addEventListener('keyup', handleKeyUp);
+  root.addEventListener('focusout', handleFocusOut);
   renderEmpty();
 
   return {
@@ -276,6 +362,15 @@ export function mountInspector(
       if (!currentPartId) return;
       updateProgressElements();
       updateDependencyWarning();
+    },
+    setFreeMode(enabled) {
+      freeMode = enabled;
+      if (!enabled) activeProgressGesture = null;
+      const input = content.querySelector<HTMLInputElement>('[data-progress-input="true"]');
+      if (input) input.disabled = !enabled;
+    },
+    abortProgressGesture() {
+      activeProgressGesture = null;
     },
     setActionState(actionState) {
       const mappings = [
@@ -292,6 +387,14 @@ export function mountInspector(
     dispose() {
       root.removeEventListener('click', handleClick);
       root.removeEventListener('input', handleInput);
+      root.removeEventListener('change', handleChange);
+      root.removeEventListener('pointerdown', handlePointerDown);
+      root.removeEventListener('pointerup', handlePointerUp);
+      root.removeEventListener('pointercancel', handlePointerCancel);
+      root.removeEventListener('keydown', handleKeyDown);
+      root.removeEventListener('keyup', handleKeyUp);
+      root.removeEventListener('focusout', handleFocusOut);
+      activeProgressGesture = null;
       root.remove();
     },
   };

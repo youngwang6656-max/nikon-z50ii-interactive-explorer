@@ -4,7 +4,9 @@ import {
   Matrix4,
   Object3D,
   PerspectiveCamera,
+  Quaternion,
   Ray,
+  Raycaster,
   Scene,
   Vector3,
 } from 'three';
@@ -15,6 +17,7 @@ import { createAssemblyState, type AssemblyState } from '../../src/domain/assemb
 import { parseManifest } from '../../src/domain/manifest';
 import {
   AxisDragController,
+  cameraWorldUp,
   chooseDragPlaneNormal,
   progressFromDistance,
   projectDeltaToAxis,
@@ -32,8 +35,11 @@ function controllerHarness(initialState = createAssemblyState(manifest)) {
   const second = new Object3D();
   const controls = { enabled: true };
   const setAssemblyState = vi.fn((next: AssemblyState) => { state = next; });
+  const camera = new PerspectiveCamera(45, 1, 0.01, 10);
+  camera.position.set(0, 1, 0);
+  camera.lookAt(0, 0, 0);
   const controller = new AxisDragController({
-    camera: new PerspectiveCamera(45, 1, 0.01, 10),
+    camera,
     controls,
     manifest,
     partIndex: new Map([
@@ -130,6 +136,54 @@ describe('AxisDragController', () => {
     expect(harness.second.matrix.elements).toEqual(matrixBefore.elements);
   });
 
+  it('allows a dependency-locked part to move back toward assembly but never above pointer-down progress', () => {
+    const prerequisiteId = manifest.parts[0]!.partId;
+    const dependentId = manifest.parts[1]!.partId;
+    const initial = {
+      ...createAssemblyState(manifest),
+      progress: {
+        ...createAssemblyState(manifest).progress,
+        [prerequisiteId]: 0.5,
+        [dependentId]: 0.5,
+      },
+      history: [],
+    };
+    let state: AssemblyState = initial;
+    const dependent = new Object3D();
+    const controls = { enabled: true };
+    const camera = new PerspectiveCamera(45, 1, 0.01, 10);
+    camera.position.set(0, 0, 1);
+    camera.lookAt(0, 0, 0);
+    const controller = new AxisDragController({
+      camera,
+      controls,
+      manifest,
+      partIndex: new Map([[dependentId, dependent]]),
+      getAssemblyState: () => state,
+      setAssemblyState: (next) => { state = next; },
+      getSelectedPartId: () => dependentId,
+      isEnabled: () => true,
+    });
+    const startRay = new Ray(new Vector3(0, 0, 1), new Vector3(0, 0, -1));
+
+    expect(controller.begin(dependentId, startRay, 44)).toEqual({
+      allowed: true,
+      missingPartIds: [prerequisiteId],
+    });
+    controller.update(new Ray(new Vector3(-0.006, 0, 1), new Vector3(0, 0, -1)));
+    expect(state.progress[dependentId]).toBeCloseTo(0.3, 12);
+    controller.update(new Ray(new Vector3(0.012, 0, 1), new Vector3(0, 0, -1)));
+    expect(state.progress[dependentId]).toBe(0.5);
+    state = {
+      ...state,
+      progress: { ...state.progress, [prerequisiteId]: 1 },
+    };
+    controller.update(new Ray(new Vector3(0.012, 0, 1), new Vector3(0, 0, -1)));
+    expect(state.progress[dependentId]).toBeCloseTo(0.9, 12);
+    expect(controller.end()).toBe(true);
+    expect(state.history).toEqual([{ partId: dependentId, from: 0.5, to: 0.9 }]);
+  });
+
   it('coalesces high-frequency previews into one undo record and restores orbit on end', () => {
     const harness = controllerHarness();
     const partId = manifest.parts[0]!.partId;
@@ -190,8 +244,11 @@ describe('AxisDragController', () => {
     const transforms = new GuidedPartTransforms(manifest);
     transforms.apply(state, new Map([[partId, part]]));
     const controls = { enabled: true };
+    const camera = new PerspectiveCamera(45, 1, 0.01, 10);
+    camera.position.set(0, 1, 0);
+    camera.lookAt(0, 0, 0);
     const controller = new AxisDragController({
-      camera: new PerspectiveCamera(45, 1, 0.01, 10),
+      camera,
       controls,
       manifest,
       partIndex: new Map([[partId, part]]),
@@ -234,6 +291,80 @@ describe('AxisDragController', () => {
     expect(result).toEqual({ allowed: true, missingPartIds: [] });
     expect(harness.controller.isDragging).toBe(false);
     expect(harness.controls.enabled).toBe(true);
+  });
+
+  it('rejects an exact camera-on-axis start before capture or orbit mutation', () => {
+    const partId = manifest.parts[0]!.partId;
+    const controls = { enabled: true };
+    const camera = new PerspectiveCamera(45, 1, 0.01, 10);
+    camera.position.set(0, 0, 1);
+    camera.lookAt(0, 0, 0);
+    camera.updateWorldMatrix(true, false);
+    const controller = new AxisDragController({
+      camera,
+      controls,
+      manifest,
+      partIndex: new Map([[partId, new Object3D()]]),
+      getAssemblyState: () => createAssemblyState(manifest),
+      setAssemblyState: vi.fn(),
+      getSelectedPartId: () => partId,
+      isEnabled: () => true,
+    });
+
+    expect(controller.begin(
+      partId,
+      new Ray(new Vector3(0, 0, 1), new Vector3(0, 0, -1)),
+      45,
+    )).toEqual({ allowed: true, missingPartIds: [] });
+    expect(controller.isDragging).toBe(false);
+    expect(controls.enabled).toBe(true);
+    expect(controller.update(new Ray(new Vector3(0.1, 0, 1), new Vector3(0, 0, -1)))).toBeNull();
+  });
+
+  it('computes camera up from the world quaternion for a parented camera', () => {
+    const parent = new Group();
+    parent.quaternion.setFromAxisAngle(new Vector3(0, 0, 1), Math.PI / 2);
+    const camera = new PerspectiveCamera();
+    parent.add(camera);
+    parent.updateWorldMatrix(true, true);
+    const expected = camera.up.clone().applyQuaternion(camera.getWorldQuaternion(new Quaternion()));
+
+    expect(cameraWorldUp(camera)).toEqual(expected.toArray());
+    expect(cameraWorldUp(camera)[0]).toBeCloseTo(-1, 14);
+  });
+
+  it('silently aborts to the pointer-down snapshot and leaves later pointer events inert', () => {
+    const pointer = canvasHarness();
+    const partId = manifest.parts[0]!.partId;
+    let state = createAssemblyState(manifest);
+    const setAssemblyState = vi.fn((next: AssemblyState) => { state = next; });
+    const controls = { enabled: true };
+    const camera = new PerspectiveCamera(45, 2, 0.01, 10);
+    camera.position.set(0, 1, 0);
+    camera.lookAt(0, 0, 0);
+    const controller = new AxisDragController({
+      canvas: pointer.canvas,
+      camera,
+      controls,
+      manifest,
+      partIndex: new Map([[partId, new Object3D()]]),
+      getAssemblyState: () => state,
+      setAssemblyState,
+      getSelectedPartId: () => partId,
+      isEnabled: () => true,
+    });
+
+    pointer.dispatch('pointerdown', { pointerId: 50 });
+    pointer.dispatch('pointermove', { pointerId: 50, clientY: 30 });
+    const callsBeforeAbort = setAssemblyState.mock.calls.length;
+    const restored = controller.abort();
+    expect(restored).toEqual(createAssemblyState(manifest));
+    expect(setAssemblyState).toHaveBeenCalledTimes(callsBeforeAbort);
+    expect(controller.isDragging).toBe(false);
+    expect(controls.enabled).toBe(true);
+    pointer.dispatch('pointermove', { pointerId: 50, clientY: 10 });
+    pointer.dispatch('pointerup', { pointerId: 50, clientY: 10 });
+    expect(setAssemblyState).toHaveBeenCalledTimes(callsBeforeAbort);
   });
 
   it('owns pointer capture and always restores orbit on pointer cancellation, lost capture, and disposal', () => {
@@ -346,6 +477,8 @@ describe('AxisDragController', () => {
     expect(handle.visible).toBe(true);
     expect(handle.userData.pickable).toBe(false);
     expect(handle.children).toHaveLength(3);
+    const raycaster = new Raycaster(new Vector3(0.1, 0.2, 1), new Vector3(0, 0, -1));
+    expect(raycaster.intersectObject(handle, true)).toEqual([]);
     expect(handle.position.toArray()).toEqual([0.1, 0.2, 0.3]);
     const orientedAxis = new Vector3(0, 1, 0).applyQuaternion(handle.quaternion);
     expect(orientedAxis.x).toBeCloseTo(0, 14);
@@ -359,6 +492,16 @@ describe('AxisDragController', () => {
     selectedPartId = manifest.parts[1]!.partId;
     controller.refreshHandle();
     expect(handle.visible).toBe(false);
+    state = {
+      ...state,
+      progress: {
+        ...state.progress,
+        [manifest.parts[0]!.partId]: 0.5,
+        [manifest.parts[1]!.partId]: 0.5,
+      },
+    };
+    controller.refreshHandle();
+    expect(handle.visible).toBe(true);
     selectedPartId = manifest.parts[0]!.partId;
     first.visible = false;
     controller.refreshHandle();

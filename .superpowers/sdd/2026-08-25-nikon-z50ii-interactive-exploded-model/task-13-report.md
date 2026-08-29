@@ -2,7 +2,7 @@
 
 ## Outcome
 
-Implemented a free disassembly mode alongside the guided teaching timeline. A selected, unlocked, visible part can be dragged only along its manifest world/glTF axis, edited with an accessible numeric range, undone as one move, cancelled exactly, or reset with the complete assembly. Guided mode remains authoritative and cancels any active free drag before crossing the mode boundary.
+Implemented a free disassembly mode alongside the guided teaching timeline. A selected visible part can be dragged only along its manifest world/glTF axis, edited with an accessible numeric range, undone as one move, cancelled exactly, or reset with the complete assembly. Missing dependencies block outward movement at zero while still allowing an already-displaced part to return toward assembly. Guided mode remains authoritative and cancels any active free drag before crossing the mode boundary.
 
 ## RED / GREEN evidence
 
@@ -12,13 +12,15 @@ Implemented a free disassembly mode alongside the guided teaching timeline. A se
 4. Added Ctrl/Command+Z edit-safety and inspector dependency/progress model tests. They failed on missing `handleUndoShortcut`, `progressValue`, and `missingDependencies`, then passed after implementation.
 5. Added a create-app integration test for free move history, undo, reset, and free→guided cancellation. It failed because the app did not own an axis controller, then passed after wiring the controller and free-state publisher.
 6. A lifecycle audit found that public `cancel()` could restore state/orbit while retaining a controller-owned pointer capture. A regression assertion failed (`releasePointerCapture(13)` missing); the root cause was the release path living only in pointer-event handlers. Moving capture release into `end()`/`cancel()` made the focused controller and app suites pass.
+7. Fix round 1 added regressions for direction-aware reverse dragging, exact camera-axis degeneracy, parented-camera world up, real `Raycaster` handle exclusion, silent drag abort, one-publication competing producers, range coalescing/cancel, guided-mode disabling, and test-ID ownership. The interrupted implementation was recovered against reviewed commit `4b1ba90` and all focused tests passed.
+8. A final browser audit added two more RED cases. A no-op range handoff after an active canvas drag initially left the aborted 67% preview visible instead of restoring 0%; a dependency-blocked range request initially left its UI at the requested value instead of the accepted value. The range transaction now records whether an axis snapshot must be restored, and the inspector rereads the synchronously published authoritative state before updating its value/label. Both cases passed in the rebuilt real-Chrome suite.
 
-Focused result: 18/18 axis/assembly tests passed. Full unit result: 91/91 tests passed before the final browser audit; the final verification command is recorded below.
+Focused result: 22/22 axis/assembly tests passed. Full unit result: 95/95 tests passed; the final verification commands are recorded below.
 
 ## Drag math and transform contract
 
 - Manifest `explodeAxis` is treated as a normalized world/glTF direction and `explodeDistance` as metres.
-- For axis **a** and camera view direction **v**, the drag-plane normal is `normalize(v - a(a·v))`. If the view is axis-parallel, camera-up is projected the same way; if that is also degenerate, the least-aligned world basis is projected. Every selected normal is finite, unit length, and perpendicular to **a**, so the plane always contains the configured axis.
+- For axis **a** and camera view direction **v**, the drag-plane normal is `normalize(v - a(a·v))`. An exact camera-on-axis view is rejected before pointer capture or OrbitControls mutation because screen-space projection is underdetermined. For valid views, camera up is derived from the camera's world quaternion; the pure normal helper retains projected-up and least-aligned-world-basis fallbacks for finite, unit, axis-perpendicular results.
 - The plane passes through the selected part's current world position. Pointer rays are intersected with it; parallel/off-plane rays return no intersection and leave state/orbit unchanged.
 - Progress is `clamp01(startProgress + ((hit - startHit) · a) / explodeDistance)`.
 - Preview updates reuse the pointer-down progress/history snapshot. They change only the selected progress value and never append history. `end()` appends exactly one `{partId, from, to}` record; a no-op appends none; `cancel()` restores the complete pointer-down state.
@@ -26,16 +28,18 @@ Focused result: 18/18 axis/assembly tests passed. Full unit result: 91/91 tests 
 
 ## Lifecycle and interaction behavior
 
-- Dependency permission is checked before object lookup, ray-plane work, pointer capture, state publication, geometry mutation, or OrbitControls mutation. Locked begin returns the exact ordered `missingPartIds` from Task 2.
+- Dependency permission is checked before object lookup, ray-plane work, pointer capture, state publication, geometry mutation, or OrbitControls mutation. A dependency-locked part at zero returns the exact ordered `missingPartIds`; a locked part above zero may begin a reverse drag but cannot exceed its pointer-down progress unless its prerequisites become complete.
 - OrbitControls is disabled only after a valid ray-plane start and is restored to its prior value on end, cancel, pointer cancel, lost capture, Escape, disposal, and free→guided mode switch.
 - Only primary left-button gestures can start; secondary/additional pointers cannot update or end the active drag.
 - Pointer capture is owned only for a valid active gesture and is released by the controller's terminal methods.
-- The cyan bidirectional handle is a separate scene object, not part of the pickable assembly root. Its line and arrow meshes have disabled raycasts, world-axis orientation, camera-distance/viewport responsive scale, and owned geometry/material disposal. It is hidden in guided mode and for unselected, locked, or hidden parts.
+- The cyan bidirectional handle is a separate scene object, not part of the pickable assembly root. Its line and arrow meshes have disabled raycasts, world-axis orientation, camera-distance/viewport responsive scale, and owned geometry/material disposal. It is hidden in guided mode and for unselected, hidden, or dependency-locked-at-zero parts; it remains available to reverse a locked part already above zero.
 - Late module mounting reapplies exact transforms and refreshes the handle. App disposal marks the app disposed before asynchronous work can republish, then cancels/releases the controller before viewer teardown.
+- `abort()` is intentionally silent: it releases capture, restores OrbitControls, and returns the pointer-down snapshot without publishing. Range, global explode, undo, reset, and guided-mode transitions consume that snapshot and perform one authoritative final publication, so later pointer events are inert and cannot overwrite the competing command.
 
 ## Inspector, commands, and modes
 
-- `data-testid="part-progress"` remains a live-percent test surface and now contains a labelled `input[type="range"]` with numeric 0–1000 values and `aria-valuetext`; the adjacent output is `aria-live`.
+- The actual labelled `input[type="range"]` owns `data-testid="part-progress"`, numeric 0–1000 values, and `aria-valuetext`; the adjacent `data-testid="part-progress-live"` output is `aria-live`. The input is disabled outside free mode.
+- Pointer, keyboard, change, blur, cancel, mode-switch, and disposal paths share one range gesture transaction. Preview events never append history, a completed continuous gesture appends at most one move, Escape restores the exact start snapshot, and blocked requests immediately snap the input and live label back to accepted state.
 - Locked warnings contain only currently missing prerequisites by their exact Chinese manifest names. Each name is a button that loads, selects, focuses, and reveals the corresponding assembly-tree part.
 - `data-testid="undo-move"` and input-safe Ctrl/Command+Z call the same undo command. Inputs, textareas, selects, and contenteditable targets keep native undo behavior.
 - Escape cancels an active drag before the existing selection shortcut can clear selection.
@@ -51,6 +55,8 @@ Focused result: 18/18 axis/assembly tests passed. Full unit result: 91/91 tests 
 - numeric range movement, one-step undo, Ctrl+Z input safety, Escape cancellation, and reset with cleared undo;
 - locked `主电路板` drag with zero motion, an exact `影像处理器封装` warning, and a working prerequisite tree link;
 - active free drag cancelled by the guided switch;
+- active free drag handed to the range, including a no-op handoff, without stale pointer publication;
+- continuous range previews coalesced into one undo record, exact Escape restoration, blocked-range authoritative snapback, and stale range completion ignored after global explode;
 - 390×844 responsive layout, no horizontal overflow, and 44 px minimum free/undo/reset/range controls;
 - zero page errors and zero console errors.
 
@@ -64,13 +70,14 @@ The existing Task 11 and Task 12 real-Chrome suites were rerun after the inspect
 
 ## Verification commands
 
-- `scripts/pnpm.ps1 test -- tests/unit/axisDragController.test.ts tests/unit/assemblyState.test.ts`
-- `scripts/pnpm.ps1 check`
-- `scripts/pnpm.ps1 test:e2e`
+- `scripts/pnpm.ps1 test -- tests/unit/axisDragController.test.ts tests/unit/assemblyState.test.ts` — 2 files, 22 tests passed.
+- `scripts/pnpm.ps1 check` — 15 files, 95 tests passed; TypeScript passed; Vite production build passed.
+- `scripts/pnpm.ps1 test:e2e` — 3/3 real-Chrome tests passed against the final rebuilt bundle.
 
 The bundled runtime's `node` directory must be on `PATH` when invoking the pnpm wrapper in this shell; equivalent direct bundled-Node commands were used during iterative RED/GREEN runs.
 
 ## Concerns
 
 - Vite continues to report the pre-existing advisory that the main minified chunk exceeds 500 kB. This does not fail the build and is unrelated to Task 13 behavior.
-- No functional, lifecycle, accessibility, transform, or browser concerns remain for Task 13.
+- The exact camera-on-axis case deliberately declines to start a drag; the user can orbit slightly or use the inspector range. This is the graceful policy chosen for the otherwise underdetermined screen projection.
+- No remaining functional, lifecycle, accessibility, transform, or browser concerns were observed for Task 13.

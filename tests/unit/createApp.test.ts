@@ -322,6 +322,36 @@ describe('createApp lifecycle', () => {
     expect(app.assemblyState.progress[partId]).toBe(0);
     expect(app.assemblyState.history).toEqual([]);
 
+    app.axisDragController!.begin(partId, startRay, 34);
+    app.axisDragController!.update(new Ray(new Vector3(0, 1, 0.02), new Vector3(0, -1, 0)));
+    const globalPublicationsBefore = (shell.root.setAttribute as ReturnType<typeof vi.fn>).mock.calls.length;
+    callbacks!.onGlobalExplode(0.4);
+    expect(app.axisDragController!.isDragging).toBe(false);
+    expect(Object.values(app.assemblyState.progress)).toEqual([0.4, 0.4]);
+    expect(app.assemblyState.history).toEqual([]);
+    expect(shell.root.setAttribute).toHaveBeenCalledTimes(globalPublicationsBefore + 1);
+    expect(app.axisDragController!.update(
+      new Ray(new Vector3(0, 1, 0.04), new Vector3(0, -1, 0)),
+    )).toBeNull();
+    expect(app.axisDragController!.end()).toBe(false);
+    expect(Object.values(app.assemblyState.progress)).toEqual([0.4, 0.4]);
+
+    app.axisDragController!.begin(partId, startRay, 35);
+    app.axisDragController!.update(new Ray(new Vector3(0, 1, 0.01), new Vector3(0, -1, 0)));
+    const undoPublicationsBefore = (shell.root.setAttribute as ReturnType<typeof vi.fn>).mock.calls.length;
+    app.undoLastMove();
+    expect(app.axisDragController!.isDragging).toBe(false);
+    expect(app.assemblyState.progress[partId]).toBe(0.4);
+    expect(shell.root.setAttribute).toHaveBeenCalledTimes(undoPublicationsBefore + 1);
+
+    app.axisDragController!.begin(partId, startRay, 36);
+    app.axisDragController!.update(new Ray(new Vector3(0, 1, 0.01), new Vector3(0, -1, 0)));
+    const resetPublicationsBefore = (shell.root.setAttribute as ReturnType<typeof vi.fn>).mock.calls.length;
+    app.resetAssembly();
+    expect(app.axisDragController!.isDragging).toBe(false);
+    expect(Object.values(app.assemblyState.progress)).toEqual([0, 0]);
+    expect(shell.root.setAttribute).toHaveBeenCalledTimes(resetPublicationsBefore + 1);
+
     app.axisDragController!.begin(partId, startRay, 32);
     app.axisDragController!.update(new Ray(new Vector3(0, 1, 0.03), new Vector3(0, -1, 0)));
     app.axisDragController!.end();
@@ -335,6 +365,8 @@ describe('createApp lifecycle', () => {
     expect(app.axisDragController!.isDragging).toBe(false);
     expect(controls.enabled).toBe(true);
     expect(app.assemblyState.history).toEqual([]);
+    expect(app.guidedSequence.snapshot().normalizedTime).toBe(0);
+    expect(Object.values(app.assemblyState.progress)).toEqual([0, 0]);
     app.dispose();
   });
 });

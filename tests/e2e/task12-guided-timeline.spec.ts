@@ -45,27 +45,28 @@ test('guided timeline moves forward and reverse, coordinates loading, and reasse
 
   await page.getByLabel('搜索相机部件').fill('Z50II-08-011');
   await page.getByTestId('part-Z50II-08-011').click();
-  await expect(page.getByTestId('part-progress')).toHaveText('100%');
+  await expect(page.getByTestId('part-progress')).toBeDisabled();
+  await expect(page.getByTestId('part-progress-live')).toHaveText('100%');
 
   await setRange(page, 'guided-progress', 1000);
   await expect(root).toHaveAttribute('data-assembly-progress', '1');
   await expect(page.locator('.timeline-count')).toHaveText('40 / 40');
-  await expect(page.getByTestId('part-progress')).toHaveText('100%');
+  await expect(page.getByTestId('part-progress-live')).toHaveText('100%');
   await expect(root).toHaveAttribute('data-camera-tween-active', 'false');
   await page.screenshot({ path: `${evidenceDir}/task-12-desktop-exploded.png` });
 
   await setRange(page, 'guided-progress', 0);
   await expect(root).toHaveAttribute('data-assembly-progress', '0');
-  await expect(page.getByTestId('part-progress')).toHaveText('0%');
+  await expect(page.getByTestId('part-progress-live')).toHaveText('0%');
 
   await setRange(page, 'global-explode', 600);
   await expect(root).toHaveAttribute('data-assembly-progress', '0.6');
-  await expect(page.getByTestId('part-progress')).toHaveText('60%');
+  await expect(page.getByTestId('part-progress-live')).toHaveText('60%');
   const atomicPlay = await page.getByTestId('guided-play').evaluate((button) => {
     (button as HTMLButtonElement).click();
     return {
       rootProgress: document.querySelector<HTMLElement>('.app-shell')?.dataset.assemblyProgress,
-      partProgress: document.querySelector<HTMLElement>('[data-testid="part-progress"]')?.textContent,
+      partProgress: document.querySelector<HTMLElement>('[data-testid="part-progress-live"]')?.textContent,
       playing: document.querySelector<HTMLElement>('.app-shell')?.dataset.guidedPlaybackActive,
     };
   });
@@ -73,7 +74,7 @@ test('guided timeline moves forward and reverse, coordinates loading, and reasse
   await page.getByTestId('guided-play').click();
   await setRange(page, 'global-explode', 0);
   await expect(root).toHaveAttribute('data-assembly-progress', '0');
-  await expect(page.getByTestId('part-progress')).toHaveText('0%');
+  await expect(page.getByTestId('part-progress-live')).toHaveText('0%');
 
   await page.getByTestId('guided-play').click();
   await expect(page.getByTestId('guided-play')).toHaveAccessibleName('暂停拆解序列');

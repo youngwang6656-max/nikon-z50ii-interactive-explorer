@@ -10,6 +10,7 @@ import {
   Object3D,
   PerspectiveCamera,
   Plane,
+  Quaternion,
   Ray,
   Raycaster,
   Vector2,
@@ -104,6 +105,11 @@ export function chooseDragPlaneNormal(
   return tuple(normal.normalize());
 }
 
+export function cameraWorldUp(camera: PerspectiveCamera): [number, number, number] {
+  camera.updateWorldMatrix(true, false);
+  return tuple(camera.up.clone().applyQuaternion(camera.getWorldQuaternion(new Quaternion())).normalize());
+}
+
 function cloneState(state: AssemblyState): AssemblyState {
   return {
     manifest: state.manifest,
@@ -169,7 +175,11 @@ export class AxisDragController {
 
   begin(partId: string, ray: Ray, pointerId = 0): MovePermission {
     const state = this.getAssemblyState();
-    const permission = canMovePart(state, partId);
+    const dependencyPermission = canMovePart(state, partId);
+    const startProgress = state.progress[partId] ?? 0;
+    const permission = dependencyPermission.allowed || startProgress > 0
+      ? { allowed: true, missingPartIds: dependencyPermission.missingPartIds }
+      : dependencyPermission;
     if (!permission.allowed) return permission;
     if (this.disposed || this.active || !this.isEnabled() || this.getSelectedPartId() !== partId) {
       return permission;
@@ -180,8 +190,13 @@ export class AxisDragController {
 
     this.camera.updateWorldMatrix(true, false);
     const cameraDirection = this.camera.getWorldDirection(new Vector3());
-    const cameraUp = this.camera.up.clone().applyQuaternion(this.camera.quaternion);
     const axis = normalized(part.explodeAxis);
+    const projectedView = cameraDirection.clone().addScaledVector(
+      axis,
+      -cameraDirection.dot(axis),
+    );
+    if (projectedView.lengthSq() <= EPSILON) return permission;
+    const cameraUp = vector(cameraWorldUp(this.camera));
     const normal = vector(chooseDragPlaneNormal(
       part.explodeAxis,
       tuple(cameraDirection),
@@ -194,7 +209,7 @@ export class AxisDragController {
     if (!startPoint) return permission;
 
     const startState = cloneState(state);
-    const startProgress = startState.progress[partId] ?? 0;
+    const capturedProgress = startState.progress[partId] ?? 0;
     const controlsWereEnabled = this.controls ? this.controls.enabled : null;
     this.active = {
       pointerId,
@@ -203,10 +218,10 @@ export class AxisDragController {
       axis,
       plane,
       startPoint,
-      startProgress,
+      startProgress: capturedProgress,
       startState,
       controlsWereEnabled,
-      previewProgress: startProgress,
+      previewProgress: capturedProgress,
     };
     if (this.controls) this.controls.enabled = false;
     this.refreshHandle();
@@ -219,10 +234,14 @@ export class AxisDragController {
     const point = ray.intersectPlane(active.plane, new Vector3());
     if (!point) return active.previewProgress;
     const projectedDistance = point.sub(active.startPoint).dot(active.axis);
-    const progress = progressFromDistance(
+    let progress = progressFromDistance(
       active.startProgress * active.explodeDistance + projectedDistance,
       active.explodeDistance,
     );
+    if (
+      progress > active.startProgress
+      && !canMovePart(this.getAssemblyState(), active.partId).allowed
+    ) progress = active.startProgress;
     if (progress === active.previewProgress) return progress;
     active.previewProgress = progress;
     this.setAssemblyState({
@@ -259,12 +278,19 @@ export class AxisDragController {
   cancel(): boolean {
     const active = this.active;
     if (!active) return false;
+    const restored = this.abort()!;
+    if (active.previewProgress !== active.startProgress) this.setAssemblyState(restored);
+    return true;
+  }
+
+  abort(): AssemblyState | null {
+    const active = this.active;
+    if (!active) return null;
     this.active = null;
     this.releasePointer();
     this.restoreControls(active);
-    if (active.previewProgress !== active.startProgress) this.setAssemblyState(active.startState);
     this.refreshHandle();
-    return true;
+    return cloneState(active.startState);
   }
 
   readonly refreshHandle = (): void => {
@@ -273,10 +299,16 @@ export class AxisDragController {
     handle.visible = false;
     const partId = this.getSelectedPartId();
     if (!this.isEnabled() || !partId || this.isPartHidden?.(partId)) return;
-    const permission = canMovePart(this.getAssemblyState(), partId);
+    const state = this.getAssemblyState();
+    const permission = canMovePart(state, partId);
     const part = this.manifest.parts.find((candidate) => candidate.partId === partId);
     const object = this.partIndex.get(partId);
-    if (!permission.allowed || !part || !object || !isEffectivelyVisible(object)) return;
+    if (
+      (!permission.allowed && (state.progress[partId] ?? 0) <= 0)
+      || !part
+      || !object
+      || !isEffectivelyVisible(object)
+    ) return;
 
     object.updateWorldMatrix(true, false);
     const origin = object.getWorldPosition(new Vector3());

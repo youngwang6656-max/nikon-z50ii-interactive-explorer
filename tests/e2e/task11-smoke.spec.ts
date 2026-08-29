@@ -41,7 +41,7 @@ test('selection, search, display commands, pointer gestures, and responsive insp
   await page.mouse.up();
   await expect(page.getByTestId('part-name-zh')).toHaveText(beforeDragName);
 
-  const progressBefore = await page.getByTestId('part-progress').innerText();
+  const progressBefore = await page.getByTestId('part-progress-live').innerText();
   const hide = page.getByRole('button', { name: '隐藏当前部件' });
   const isolate = page.getByRole('button', { name: '隔离显示当前部件' });
   const transparency = page.getByRole('button', { name: '切换当前部件透明度' });
@@ -62,7 +62,7 @@ test('selection, search, display commands, pointer gestures, and responsive insp
   await page.getByTestId('part-Z50II-03-009').click();
   await expect(transparency).toHaveAttribute('aria-pressed', 'true');
   await transparency.click();
-  await expect(page.getByTestId('part-progress')).toHaveText(progressBefore);
+  await expect(page.getByTestId('part-progress-live')).toHaveText(progressBefore);
 
   await isolate.click();
   await expect(isolate).toHaveAttribute('aria-pressed', 'true');

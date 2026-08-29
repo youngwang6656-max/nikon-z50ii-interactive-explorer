@@ -112,6 +112,12 @@ export async function createApp(
   let timeline: TimelineController | null = null;
   let selectionController: SelectionController | null = null;
   let axisDragController: AxisDragController | null = null;
+  let rangeGesture: {
+    readonly partId: string;
+    readonly startState: AssemblyState;
+    readonly restoreRequired: boolean;
+    progress: number;
+  } | null = null;
   let selectionRequest = 0;
   const requestFrame = dependencies.requestAnimationFrame
     ?? ((callback: FrameRequestCallback) => window.requestAnimationFrame(callback));
@@ -281,16 +287,30 @@ export async function createApp(
     publishSelectedTransformBasis(selectionController?.selectedPartId ?? null);
   };
 
+  const cloneAssemblyState = (state: AssemblyState): AssemblyState => ({
+    manifest: state.manifest,
+    progress: { ...state.progress },
+    history: state.history.map((move) => ({ ...move })),
+  });
+
+  const abortAllFreeGestures = (): AssemblyState => {
+    const rangeStart = rangeGesture?.startState ?? null;
+    const axisStart = axisDragController?.abort() ?? null;
+    rangeGesture = null;
+    inspector?.abortProgressGesture();
+    return cloneAssemblyState(rangeStart ?? axisStart ?? assemblyState);
+  };
+
   const undoFreeMove = (): void => {
     if (interactionMode !== 'free' || disposed) return;
-    axisDragController?.cancel();
-    publishFreeAssembly(undoLastMoveState(assemblyState));
+    const baseline = abortAllFreeGestures();
+    publishFreeAssembly(undoLastMoveState(baseline));
   };
 
   const resetFreeAssembly = (): void => {
     if (disposed) return;
-    axisDragController?.cancel();
-    const nextState = resetAssemblyState(assemblyState);
+    const baseline = abortAllFreeGestures();
+    const nextState = resetAssemblyState(baseline);
     if (interactionMode === 'free') publishFreeAssembly(nextState);
     else {
       assemblyState = nextState;
@@ -383,14 +403,47 @@ export async function createApp(
         updateSelectionUi(partId);
       },
       onResetSelection: () => { selectionController?.select(null); },
-      onProgressChange: (partId, progress) => {
+      onProgressGesture: (partId, progress, phase) => {
         if (interactionMode !== 'free') return;
-        publishFreeAssembly(setPartProgress(assemblyState, partId, progress));
+        if (phase === 'begin') {
+          const axisStart = axisDragController?.abort() ?? null;
+          const startState = cloneAssemblyState(axisStart ?? assemblyState);
+          rangeGesture = {
+            partId,
+            startState,
+            restoreRequired: axisStart !== null,
+            progress: startState.progress[partId] ?? 0,
+          };
+          return;
+        }
+        const gesture = rangeGesture;
+        if (!gesture || gesture.partId !== partId) return;
+        if (phase === 'preview') {
+          const moved = setPartProgress(gesture.startState, partId, progress);
+          const preview = moved === gesture.startState
+            ? gesture.startState
+            : { ...moved, history: gesture.startState.history.map((move) => ({ ...move })) };
+          gesture.progress = preview.progress[partId] ?? gesture.startState.progress[partId] ?? 0;
+          publishFreeAssembly(preview);
+          return;
+        }
+        rangeGesture = null;
+        if (phase === 'cancel') {
+          publishFreeAssembly(gesture.startState);
+          return;
+        }
+        const from = gesture.startState.progress[partId] ?? 0;
+        if (gesture.progress === from) {
+          if (gesture.restoreRequired) publishFreeAssembly(gesture.startState);
+          return;
+        }
+        publishFreeAssembly(setPartProgress(gesture.startState, partId, gesture.progress));
       },
       onSelectDependency: (partId) => { void selectTreePart(partId); },
       onUndoMove: undoFreeMove,
       onResetAssembly: resetFreeAssembly,
     });
+    inspector.setFreeMode(false);
     selectionController.onSelectionChange((partId) => {
       selectionRequest += 1;
       displayController?.reconcileSelection(partId);
@@ -426,13 +479,16 @@ export async function createApp(
   if (shell.timelinePanel) {
     timeline = (dependencies.mountTimeline ?? mountTimeline)(shell.timelinePanel, manifest, {
       onModeChange(mode) {
-        if (mode === 'guided') axisDragController?.cancel();
-        else cancelGuidedPlayback();
+        const baseline = mode === 'guided' ? abortAllFreeGestures() : assemblyState;
+        if (mode === 'free') cancelGuidedPlayback();
         interactionMode = mode;
+        inspector?.setFreeMode(mode === 'free');
         timeline?.setMode(mode);
         if (mode === 'free') publishFreeAssembly(assemblyState);
         else {
-          guidedSequence.replaceAssemblyState(assemblyState);
+          assemblyState = baseline;
+          publishedProgress = averageProgress(baseline);
+          guidedSequence.replaceAssemblyState(baseline);
           seekGuided(publishedProgress);
         }
       },
@@ -471,11 +527,12 @@ export async function createApp(
         if (interactionMode === 'guided') seekGuided(normalizedTime);
       },
       onGlobalExplode(progress) {
+        const baseline = abortAllFreeGestures();
         guidedSequence.pause();
         cameraTween?.cancel();
         previousFrameTime = null;
         assemblyState = {
-          ...setGlobalExplode(assemblyState, progress),
+          ...setGlobalExplode(baseline, progress),
           history: [],
         };
         guidedSequence.replaceAssemblyState(assemblyState);
