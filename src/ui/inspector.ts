@@ -1,5 +1,7 @@
 import type { AssemblyState } from '../domain/assemblyState';
 import type { AssemblyManifest } from '../domain/manifest';
+import type { CutawayAxis } from '../viewer/cutawayController';
+import type { LightingPreset } from '../viewer/lightingController';
 
 export interface InspectorViewModel {
   partId: string;
@@ -20,6 +22,12 @@ export interface InspectorCallbacks {
   onHide(partId: string): void;
   onIsolate(partId: string): void;
   onTransparency(partId: string): void;
+  onVisibilityReset(): void;
+  onCutawayToggle(enabled: boolean): void;
+  onCutawayAxis(axis: CutawayAxis): void;
+  onCutawayOffset(offset: number): void;
+  onLightingPreset(preset: LightingPreset): void;
+  onCameraPreset(preset: string): void;
   onResetSelection(): void;
   onProgressGesture(
     partId: string,
@@ -94,16 +102,79 @@ export function mountInspector(
   title.id = 'inspector-heading';
   heading.append(node('span', 'panel-index', '02'), title, node('span', 'panel-meta', 'INSPECTOR'));
   const content = node('div', 'inspector-content');
+  const inspectionTools = node('section', 'inspection-tools');
+  inspectionTools.setAttribute('aria-label', '剖切、照明与相机视图');
+  const toolsTitle = node('h3', 'inspection-tools-title', '检查工具 / Inspection');
+  const visibilityReset = node('button', 'inspector-action inspection-wide', '重置可见性');
+  visibilityReset.type = 'button';
+  visibilityReset.dataset.action = 'visibility-reset';
+  visibilityReset.dataset.testid = 'visibility-reset';
+  const cutawayRow = node('div', 'inspection-tool-row');
+  const cutawayToggle = node('button', 'inspector-action', '剖切');
+  cutawayToggle.type = 'button';
+  cutawayToggle.dataset.action = 'cutaway-toggle';
+  cutawayToggle.dataset.testid = 'cutaway-toggle';
+  cutawayToggle.setAttribute('aria-pressed', 'false');
+  const cutawayAxis = node('select', 'inspection-select');
+  cutawayAxis.dataset.testid = 'cutaway-axis';
+  cutawayAxis.setAttribute('aria-label', '剖切轴');
+  for (const axis of ['x', 'y', 'z'] as const) {
+    const option = node('option', '', axis.toUpperCase());
+    option.value = axis;
+    cutawayAxis.append(option);
+  }
+  cutawayRow.append(cutawayToggle, cutawayAxis);
+  const cutawayOffset = node('input', 'inspection-range');
+  cutawayOffset.type = 'range';
+  cutawayOffset.min = '-0.12';
+  cutawayOffset.max = '0.12';
+  cutawayOffset.step = '0.001';
+  cutawayOffset.value = '0';
+  cutawayOffset.dataset.testid = 'cutaway-offset';
+  cutawayOffset.setAttribute('aria-label', '剖切面有符号偏移');
+  const lightingPreset = node('select', 'inspection-select inspection-wide');
+  lightingPreset.dataset.testid = 'lighting-preset';
+  lightingPreset.setAttribute('aria-label', '照明预设');
+  for (const [value, label] of [
+    ['studio', '摄影棚 / Studio'],
+    ['inspection', '检查 / Inspection'],
+  ] as const) {
+    const option = node('option', '', label);
+    option.value = value;
+    lightingPreset.append(option);
+  }
+  const cameraViews = node('div', 'camera-preset-grid');
+  for (const [value, label] of [
+    ['front', '前'], ['rear', '后'], ['left', '左'],
+    ['right', '右'], ['top', '顶'], ['three-quarter', '3/4'],
+  ] as const) {
+    const button = node('button', 'camera-preset', label);
+    button.type = 'button';
+    button.dataset.action = 'camera-preset';
+    button.dataset.preset = value;
+    button.dataset.testid = `camera-preset-${value}`;
+    button.setAttribute('aria-label', `${label}视图`);
+    cameraViews.append(button);
+  }
+  inspectionTools.append(
+    toolsTitle,
+    visibilityReset,
+    cutawayRow,
+    cutawayOffset,
+    lightingPreset,
+    cameraViews,
+  );
   const footer = node('footer', 'inspector-footer');
   footer.append(
     node('span', 'notice-mark', '!'),
     node('p', 'notice-copy', '参考级内部结构，非 Nikon 原厂 CAD'),
   );
-  root.append(heading, content, footer);
+  root.append(heading, content, inspectionTools, footer);
   host.replaceChildren(root);
   let currentPartId: string | null = null;
   let currentAssemblyState = state;
   let freeMode = false;
+  let cutawayEnabled = false;
   let activeProgressGesture: {
     readonly partId: string;
     readonly startProgress: number;
@@ -213,7 +284,7 @@ export function mountInspector(
       ['focus', '定位', '定位当前部件'],
       ['hide', '隐藏', '隐藏当前部件'],
       ['isolate', '隔离', '隔离显示当前部件'],
-      ['transparency', '透明', '切换当前部件透明度'],
+      ['transparency', '幽灵', '切换当前部件透明度'],
       ['undo-move', '撤销移动', '撤销上一次自由拆解移动'],
       ['reset-assembly', '重置总成', '将全部部件恢复到装配位置'],
       ['reset', '取消选择', '清除当前部件选择'],
@@ -223,6 +294,9 @@ export function mountInspector(
       button.type = 'button';
       button.dataset.action = action;
       if (action === 'undo-move' || action === 'reset-assembly') button.dataset.testid = action;
+      if (action === 'hide') button.dataset.testid = 'hide-selected';
+      if (action === 'isolate') button.dataset.testid = 'isolate-selected';
+      if (action === 'transparency') button.dataset.testid = 'ghost-selected';
       button.setAttribute('aria-label', ariaLabel);
       actions.append(button);
     }
@@ -234,6 +308,24 @@ export function mountInspector(
       ? event.target.closest<HTMLElement>('[data-action]')?.dataset.action
       : undefined;
     if (!action) return;
+    if (action === 'visibility-reset') {
+      callbacks.onVisibilityReset();
+      return;
+    }
+    if (action === 'cutaway-toggle') {
+      cutawayEnabled = !cutawayEnabled;
+      cutawayToggle.classList.toggle('is-active', cutawayEnabled);
+      cutawayToggle.setAttribute('aria-pressed', String(cutawayEnabled));
+      callbacks.onCutawayToggle(cutawayEnabled);
+      return;
+    }
+    if (action === 'camera-preset') {
+      const preset = event.target instanceof Element
+        ? event.target.closest<HTMLElement>('[data-preset]')?.dataset.preset
+        : undefined;
+      if (preset) callbacks.onCameraPreset(preset);
+      return;
+    }
     if (action === 'select-dependency') {
       const partId = event.target instanceof Element
         ? event.target.closest<HTMLElement>('[data-part-id]')?.dataset.partId
@@ -304,10 +396,22 @@ export function mountInspector(
     callbacks.onProgressGesture(gesture.partId, gesture.startProgress, 'cancel');
   };
   const handleInput = (event: Event): void => {
+    if (event.target === cutawayOffset) {
+      callbacks.onCutawayOffset(Number(cutawayOffset.value));
+      return;
+    }
     const input = progressInputFrom(event.target);
     if (input) publishProgressPreview(input);
   };
   const handleChange = (event: Event): void => {
+    if (event.target === cutawayAxis) {
+      callbacks.onCutawayAxis(cutawayAxis.value as CutawayAxis);
+      return;
+    }
+    if (event.target === lightingPreset) {
+      callbacks.onLightingPreset(lightingPreset.value as LightingPreset);
+      return;
+    }
     if (progressInputFrom(event.target)) commitProgressGesture();
   };
   const handlePointerDown = (event: PointerEvent): void => {

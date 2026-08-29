@@ -28,7 +28,7 @@ describe('PartDisplayController', () => {
     controller.toggleTransparency('left');
 
     expect(left.mesh.material).not.toBe(shared);
-    expect((left.mesh.material as MeshStandardMaterial).opacity).toBe(0.24);
+    expect((left.mesh.material as MeshStandardMaterial).opacity).toBe(0.18);
     expect((left.mesh.material as MeshStandardMaterial).map).toBe(sharedTexture);
     expect(right.mesh.material).toBe(shared);
     expect(shared.opacity).toBe(0.82);

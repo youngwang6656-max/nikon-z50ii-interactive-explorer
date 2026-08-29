@@ -26,6 +26,9 @@ import { PartDisplayController } from '../viewer/partDisplayController';
 import { GuidedPartTransforms } from '../viewer/guidedPartTransforms';
 import { SelectionController } from '../viewer/selectionController';
 import { AxisDragController } from '../viewer/axisDragController';
+import { CutawayController } from '../viewer/cutawayController';
+import { LightingController } from '../viewer/lightingController';
+import type { VisibilityController } from '../viewer/visibilityController';
 
 export interface App {
   readonly manifest: AssemblyManifest;
@@ -35,6 +38,9 @@ export interface App {
   readonly assemblyState: AssemblyState;
   readonly selectionController: SelectionController | null;
   readonly axisDragController: AxisDragController | null;
+  readonly visibilityController: VisibilityController | null;
+  readonly cutawayController: CutawayController | null;
+  readonly lightingController: LightingController | null;
   readonly assemblyTree: AssemblyTreeController | null;
   readonly inspector: InspectorController | null;
   readonly timeline: TimelineController | null;
@@ -106,6 +112,13 @@ export async function createApp(
   const displayController = viewer.partIndex
     ? new PartDisplayController(viewer.partIndex)
     : null;
+  const visibilityController = displayController?.visibility ?? null;
+  const cutawayController = visibilityController && viewer.renderer && viewer.scene
+    ? new CutawayController(viewer.renderer, viewer.scene, visibilityController)
+    : null;
+  const lightingController = visibilityController && viewer.renderer && viewer.scene
+    ? new LightingController(viewer.renderer, viewer.scene, visibilityController)
+    : null;
 
   let assemblyTree: AssemblyTreeController | null = null;
   let inspector: InspectorController | null = null;
@@ -126,7 +139,10 @@ export async function createApp(
   const reducedMotion = dependencies.prefersReducedMotion?.()
     ?? (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const cameraTween = viewer.camera && viewer.controls
-    ? new CameraPresetTween(viewer.camera, viewer.controls, { reducedMotion })
+    ? new CameraPresetTween(viewer.camera, viewer.controls, {
+        reducedMotion,
+        ...(viewer.partIndex ? { getVisibleObjects: () => viewer.partIndex.values() } : {}),
+      })
     : null;
   let animationFrameId: number | null = null;
   let animationGeneration = 0;
@@ -150,6 +166,8 @@ export async function createApp(
       mountedModuleIds.add(loaded.moduleId);
       assemblyTree?.setLoadProgress(mountedModuleIds.size, manifest.modules.length);
       displayController?.apply();
+      cutawayController?.refresh();
+      lightingController?.refresh();
       if (viewer.partIndex) guidedTransforms.apply(assemblyState, viewer.partIndex);
       axisDragController?.refreshHandle();
     } catch (error) {
@@ -416,6 +434,18 @@ export async function createApp(
         displayController?.toggleTransparency(partId);
         updateSelectionUi(partId);
       },
+      onVisibilityReset: () => {
+        visibilityController?.resetVisibility();
+        updateSelectionUi(selectionController?.selectedPartId ?? null);
+      },
+      onCutawayToggle: (enabled) => { cutawayController?.setEnabled(enabled); },
+      onCutawayAxis: (axis) => { cutawayController?.setAxis(axis); },
+      onCutawayOffset: (offset) => { cutawayController?.setOffset(offset); },
+      onLightingPreset: (preset) => { lightingController?.setPreset(preset); },
+      onCameraPreset: (preset) => {
+        cameraTween?.start(preset);
+        if (cameraTween?.active) ensureAnimationFrame();
+      },
       onResetSelection: () => { selectionController?.select(null); },
       onProgressGesture: (partId, progress, phase) => {
         if (interactionMode !== 'free') return;
@@ -594,6 +624,9 @@ export async function createApp(
     get assemblyState() { return assemblyState; },
     selectionController,
     axisDragController,
+    visibilityController,
+    cutawayController,
+    lightingController,
     assemblyTree,
     inspector,
     timeline,
@@ -622,6 +655,8 @@ export async function createApp(
       selectionController?.dispose();
       assemblyTree?.dispose();
       inspector?.dispose();
+      cutawayController?.dispose();
+      lightingController?.dispose();
       displayController?.dispose();
       moduleLoader.dispose();
       viewer.dispose();

@@ -1,4 +1,4 @@
-import { EventDispatcher, PerspectiveCamera, Vector3 } from 'three';
+import { BoxGeometry, EventDispatcher, Mesh, PerspectiveCamera, Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import { CameraPresetTween } from '../../src/viewer/cameraPresetTween';
@@ -60,5 +60,26 @@ describe('camera preset tween', () => {
     const disposedPosition = camera.position.clone();
     tween.start('bottom');
     expect(camera.position.equals(disposedPosition)).toBe(true);
+  });
+
+  it('fits six presets to current visible bounds and updates the OrbitControls target', () => {
+    const camera = new PerspectiveCamera(40, 0.5, 0.01, 10);
+    const controls = new FakeControls();
+    const visible = new Mesh(new BoxGeometry(0.2, 0.1, 0.08));
+    visible.position.set(0.04, 0.02, -0.03);
+    visible.updateMatrixWorld(true);
+    const tween = new CameraPresetTween(camera, controls, {
+      reducedMotion: true,
+      getVisibleObjects: () => [visible],
+    });
+
+    for (const preset of ['front', 'rear', 'left', 'right', 'top', 'three-quarter']) {
+      tween.start(preset);
+      expect(camera.position.distanceTo(controls.target)).toBeGreaterThan(0.2);
+      expect(camera.position.distanceTo(controls.target)).toBeLessThan(2);
+    }
+    expect(controls.target.x).toBeCloseTo(0.04, 12);
+    expect(controls.target.y).toBeCloseTo(0.02, 12);
+    expect(controls.target.z).toBeCloseTo(-0.03, 12);
   });
 });

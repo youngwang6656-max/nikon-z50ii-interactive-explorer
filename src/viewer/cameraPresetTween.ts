@@ -1,4 +1,4 @@
-import { PerspectiveCamera, Vector3 } from 'three';
+import { Box3, Mesh, Object3D, PerspectiveCamera, Sphere, Vector3 } from 'three';
 
 export interface CameraControlsLike {
   readonly target: Vector3;
@@ -8,6 +8,8 @@ export interface CameraControlsLike {
 export interface CameraPresetTweenOptions {
   durationMs?: number;
   reducedMotion?: boolean;
+  getVisibleObjects?: () => Iterable<Object3D>;
+  fitPadding?: number;
 }
 
 const PRESET_OFFSETS = {
@@ -22,6 +24,21 @@ const PRESET_OFFSETS = {
 
 const DEFAULT_DURATION_MS = 480;
 
+function visibleBounds(objects: Iterable<Object3D>): Box3 {
+  const bounds = new Box3().makeEmpty();
+  for (const root of objects) {
+    root.updateWorldMatrix(true, true);
+    root.traverseVisible((object) => {
+      if (!(object instanceof Mesh) || !object.geometry) return;
+      if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+      if (object.geometry.boundingBox) {
+        bounds.union(object.geometry.boundingBox.clone().applyMatrix4(object.matrixWorld));
+      }
+    });
+  }
+  return bounds;
+}
+
 function easeInOutCubic(value: number): number {
   return value < 0.5
     ? 4 * value * value * value
@@ -31,6 +48,8 @@ function easeInOutCubic(value: number): number {
 export class CameraPresetTween {
   private readonly durationMs: number;
   private readonly reducedMotion: boolean;
+  private readonly getVisibleObjects: (() => Iterable<Object3D>) | undefined;
+  private readonly fitPadding: number;
   private readonly from = new Vector3();
   private readonly to = new Vector3();
   private elapsedMs = 0;
@@ -50,6 +69,10 @@ export class CameraPresetTween {
       ? options.durationMs!
       : DEFAULT_DURATION_MS;
     this.reducedMotion = options.reducedMotion ?? false;
+    this.getVisibleObjects = options.getVisibleObjects;
+    this.fitPadding = Number.isFinite(options.fitPadding) && (options.fitPadding ?? 0) > 0
+      ? options.fitPadding!
+      : 1.18;
     controls.addEventListener('start', this.cancelForUserOrbit);
   }
 
@@ -59,10 +82,25 @@ export class CameraPresetTween {
 
   start(presetName: string): void {
     if (this.disposed) return;
-    const offset = PRESET_OFFSETS[presetName as keyof typeof PRESET_OFFSETS]
+    const presetOffset = PRESET_OFFSETS[presetName as keyof typeof PRESET_OFFSETS]
       ?? PRESET_OFFSETS['three-quarter'];
+    const offset = new Vector3(...presetOffset);
+    if (this.getVisibleObjects) {
+      const bounds = visibleBounds(this.getVisibleObjects());
+      if (!bounds.isEmpty()) {
+        const center = bounds.getCenter(new Vector3());
+        const radius = bounds.getBoundingSphere(new Sphere()).radius;
+        const verticalHalfFov = (this.camera.fov * Math.PI) / 360;
+        const horizontalHalfFov = Math.atan(Math.tan(verticalHalfFov) * this.camera.aspect);
+        const limitingHalfFov = Math.max(0.01, Math.min(verticalHalfFov, horizontalHalfFov));
+        const distance = Math.max(0.01, (radius / Math.sin(limitingHalfFov)) * this.fitPadding);
+        const direction = offset.normalize().multiplyScalar(distance);
+        this.controls.target.copy(center);
+        offset.copy(direction);
+      }
+    }
     this.from.copy(this.camera.position);
-    this.to.copy(this.controls.target).add(new Vector3(...offset));
+    this.to.copy(this.controls.target).add(offset);
     this.elapsedMs = 0;
 
     if (this.reducedMotion) {
