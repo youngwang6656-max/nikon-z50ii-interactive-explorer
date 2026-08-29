@@ -28,12 +28,22 @@ describe('selection UI models', () => {
     expect(model?.nameZh).toBe(part.nameZh);
     expect(model?.nameEn).toBe(part.nameEn);
     expect(model?.progressLabel).toBe('38%');
+    expect(model?.progressValue).toBe(0.375);
     expect(model?.dependencies).toEqual(
       part.dependsOn.map((partId) => {
         const dependency = manifest.parts.find((candidate) => candidate.partId === partId)!;
         return `${dependency.nameZh} / ${dependency.nameEn}`;
       }),
     );
+    expect(model?.missingDependencies).toEqual(
+      part.dependsOn.map((partId) => {
+        const dependency = manifest.parts.find((candidate) => candidate.partId === partId)!;
+        return { partId, nameZh: dependency.nameZh };
+      }),
+    );
+
+    part.dependsOn.forEach((partId) => { state.progress[partId] = 1; });
+    expect(createInspectorViewModel(manifest, state, part.partId)?.missingDependencies).toEqual([]);
   });
 
   it('keeps a canvas-selected row visible outside the active search filter', () => {

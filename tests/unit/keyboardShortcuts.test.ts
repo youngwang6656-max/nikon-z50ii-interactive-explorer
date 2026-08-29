@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { handleSelectionShortcut } from '../../src/ui/keyboardShortcuts';
+import { handleSelectionShortcut, handleUndoShortcut } from '../../src/ui/keyboardShortcuts';
 
 function event(key: string, target: Record<string, unknown>) {
   return {
@@ -30,4 +30,45 @@ describe('selection keyboard shortcuts', () => {
     expect(focusSearch).not.toHaveBeenCalled();
     expect(keyEvent.preventDefault).not.toHaveBeenCalled();
   });
+});
+
+describe('free-move keyboard shortcuts', () => {
+  it('invokes undo for Ctrl+Z and Command+Z outside editable controls', () => {
+    const undo = vi.fn();
+    const ctrlEvent = {
+      ...event('z', { tagName: 'DIV', isContentEditable: false }),
+      ctrlKey: true,
+      metaKey: false,
+      shiftKey: false,
+    } as KeyboardEvent;
+    const commandEvent = {
+      ...event('Z', { tagName: 'BUTTON', isContentEditable: false }),
+      ctrlKey: false,
+      metaKey: true,
+      shiftKey: false,
+    } as KeyboardEvent;
+
+    expect(handleUndoShortcut(ctrlEvent, undo)).toBe(true);
+    expect(handleUndoShortcut(commandEvent, undo)).toBe(true);
+    expect(undo).toHaveBeenCalledTimes(2);
+    expect(ctrlEvent.preventDefault).toHaveBeenCalledTimes(1);
+    expect(commandEvent.preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['INPUT', 'TEXTAREA', 'SELECT'])(
+    'does not hijack Ctrl+Z from an editable %s',
+    (tagName) => {
+      const undo = vi.fn();
+      const keyEvent = {
+        ...event('z', { tagName, isContentEditable: false }),
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: false,
+      } as KeyboardEvent;
+
+      expect(handleUndoShortcut(keyEvent, undo)).toBe(false);
+      expect(undo).not.toHaveBeenCalled();
+      expect(keyEvent.preventDefault).not.toHaveBeenCalled();
+    },
+  );
 });

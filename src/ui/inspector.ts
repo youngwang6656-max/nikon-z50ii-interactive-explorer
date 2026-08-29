@@ -11,6 +11,8 @@ export interface InspectorViewModel {
   reconstructionLabel: string;
   dependencies: string[];
   progressLabel: string;
+  progressValue: number;
+  missingDependencies: Array<{ partId: string; nameZh: string }>;
 }
 
 export interface InspectorCallbacks {
@@ -19,6 +21,10 @@ export interface InspectorCallbacks {
   onIsolate(partId: string): void;
   onTransparency(partId: string): void;
   onResetSelection(): void;
+  onProgressChange(partId: string, progress: number): void;
+  onSelectDependency(partId: string): void;
+  onUndoMove(): void;
+  onResetAssembly(): void;
 }
 
 export interface InspectorController {
@@ -49,6 +55,13 @@ export function createInspectorViewModel(
       return dependency ? `${dependency.nameZh} / ${dependency.nameEn}` : dependencyId;
     }),
     progressLabel: `${Math.round((state.progress[partId] ?? 0) * 100)}%`,
+    progressValue: state.progress[partId] ?? 0,
+    missingDependencies: part.dependsOn
+      .filter((dependencyId) => (state.progress[dependencyId] ?? 0) < 1)
+      .map((dependencyId) => ({
+        partId: dependencyId,
+        nameZh: parts.get(dependencyId)?.nameZh ?? dependencyId,
+      })),
   };
 }
 
@@ -85,6 +98,50 @@ export function mountInspector(
   let currentPartId: string | null = null;
   let currentAssemblyState = state;
 
+  const updateProgressElements = (): void => {
+    if (!currentPartId) return;
+    const value = currentAssemblyState.progress[currentPartId] ?? 0;
+    const label = `${Math.round(value * 100)}%`;
+    const input = content.querySelector<HTMLInputElement>('[data-progress-input="true"]');
+    if (input) {
+      input.value = String(Math.round(value * 1000));
+      input.setAttribute('aria-valuetext', label);
+    }
+    const live = content.querySelector<HTMLOutputElement>('[data-testid="part-progress-live"]');
+    if (live) {
+      live.value = label;
+      live.textContent = label;
+    }
+  };
+
+  const updateDependencyWarning = (): void => {
+    if (!currentPartId) return;
+    const model = createInspectorViewModel(manifest, currentAssemblyState, currentPartId);
+    const list = content.querySelector<HTMLUListElement>('[data-testid="dependency-warning"]');
+    if (!model || !list) return;
+    if (model.missingDependencies.length === 0) {
+      list.replaceChildren(node(
+        'li',
+        'dependency-ready',
+        model.dependencies.length > 0 ? '前置条件已满足' : '无前置依赖 / None',
+      ));
+      list.dataset.locked = 'false';
+      return;
+    }
+    const rows = model.missingDependencies.map((missing) => {
+      const item = node('li', 'dependency-missing');
+      const link = node('button', 'dependency-link', missing.nameZh);
+      link.type = 'button';
+      link.dataset.action = 'select-dependency';
+      link.dataset.partId = missing.partId;
+      link.setAttribute('aria-label', `定位并选择前置部件：${missing.nameZh}`);
+      item.append(link);
+      return item;
+    });
+    list.replaceChildren(...rows);
+    list.dataset.locked = 'true';
+  };
+
   const renderEmpty = (): void => {
     content.className = 'inspector-content inspector-empty';
     content.replaceChildren(
@@ -111,17 +168,35 @@ export function mountInspector(
     const descriptionZh = node('p', 'inspector-description-zh', model.descriptionZh);
     const descriptionEn = node('p', 'inspector-description-en', model.descriptionEn);
     const metrics = node('dl', 'inspector-metrics');
-    metrics.append(
-      node('dt', '', '拆解步骤'), node('dd', '', String(model.step).padStart(2, '0')),
-      node('dt', '', '当前爆炸进度'), node('dd', '', model.progressLabel),
-    );
-    metrics.lastElementChild?.setAttribute('data-testid', 'part-progress');
+    metrics.append(node('dt', '', '拆解步骤'), node('dd', '', String(model.step).padStart(2, '0')));
+    const progressTerm = node('dt', '', '当前爆炸进度');
+    const progressControl = node('dd', 'part-progress-control');
+    progressControl.dataset.testid = 'part-progress';
+    progressControl.setAttribute('role', 'group');
+    progressControl.setAttribute('aria-label', `${model.nameZh}拆解进度控制`);
+    const progressInput = node('input', 'part-progress-range');
+    progressInput.type = 'range';
+    progressInput.min = '0';
+    progressInput.max = '1000';
+    progressInput.step = '1';
+    progressInput.value = String(Math.round(model.progressValue * 1000));
+    progressInput.dataset.progressInput = 'true';
+    progressInput.setAttribute('aria-label', `${model.nameZh}拆解进度`);
+    progressInput.setAttribute('aria-valuetext', model.progressLabel);
+    const progressLive = node('output', 'part-progress-live', model.progressLabel);
+    progressLive.dataset.testid = 'part-progress-live';
+    progressLive.setAttribute('aria-live', 'polite');
+    progressControl.append(progressInput, progressLive);
+    Object.defineProperty(progressControl, 'value', {
+      configurable: true,
+      get: () => progressInput.value,
+      set: (value: unknown) => { progressInput.value = String(value); },
+    });
+    metrics.append(progressTerm, progressControl);
     const dependencies = node('section', 'dependency-section');
     const dependencyTitle = node('h4', '', '前置依赖 / Dependencies');
     const dependencyList = node('ul', 'dependency-list');
     dependencyList.dataset.testid = 'dependency-warning';
-    const values = model.dependencies.length > 0 ? model.dependencies : ['无前置依赖 / None'];
-    values.forEach((value) => dependencyList.append(node('li', '', value)));
     dependencies.append(dependencyTitle, dependencyList);
     const actions = node('div', 'inspector-actions');
     const actionDefinitions = [
@@ -129,22 +204,41 @@ export function mountInspector(
       ['hide', '隐藏', '隐藏当前部件'],
       ['isolate', '隔离', '隔离显示当前部件'],
       ['transparency', '透明', '切换当前部件透明度'],
+      ['undo-move', '撤销移动', '撤销上一次自由拆解移动'],
+      ['reset-assembly', '重置总成', '将全部部件恢复到装配位置'],
       ['reset', '取消选择', '清除当前部件选择'],
     ] as const;
     for (const [action, label, ariaLabel] of actionDefinitions) {
       const button = node('button', 'inspector-action', label);
       button.type = 'button';
       button.dataset.action = action;
+      if (action === 'undo-move' || action === 'reset-assembly') button.dataset.testid = action;
       button.setAttribute('aria-label', ariaLabel);
       actions.append(button);
     }
     content.replaceChildren(identity, zh, en, descriptionZh, descriptionEn, metrics, dependencies, actions);
+    updateDependencyWarning();
   };
   const handleClick = (event: MouseEvent): void => {
     const action = event.target instanceof Element
       ? event.target.closest<HTMLElement>('[data-action]')?.dataset.action
       : undefined;
     if (!action) return;
+    if (action === 'select-dependency') {
+      const partId = event.target instanceof Element
+        ? event.target.closest<HTMLElement>('[data-part-id]')?.dataset.partId
+        : undefined;
+      if (partId) callbacks.onSelectDependency(partId);
+      return;
+    }
+    if (action === 'undo-move') {
+      callbacks.onUndoMove();
+      return;
+    }
+    if (action === 'reset-assembly') {
+      callbacks.onResetAssembly();
+      return;
+    }
     if (action === 'reset') {
       callbacks.onResetSelection();
       return;
@@ -155,7 +249,24 @@ export function mountInspector(
     else if (action === 'isolate') callbacks.onIsolate(currentPartId);
     else if (action === 'transparency') callbacks.onTransparency(currentPartId);
   };
+  const handleInput = (event: Event): void => {
+    const target = event.target instanceof Element ? event.target : null;
+    const control = target?.closest<HTMLElement>('[data-testid="part-progress"]') ?? null;
+    const input = target instanceof HTMLInputElement && target.dataset.progressInput === 'true'
+      ? target
+      : control?.querySelector<HTMLInputElement>('[data-progress-input="true"]') ?? null;
+    if (!input || !currentPartId) return;
+    callbacks.onProgressChange(currentPartId, Number(input.value) / 1000);
+    const label = `${Math.round(Number(input.value) / 10)}%`;
+    input.setAttribute('aria-valuetext', label);
+    const live = content.querySelector<HTMLOutputElement>('[data-testid="part-progress-live"]');
+    if (live) {
+      live.value = label;
+      live.textContent = label;
+    }
+  };
   root.addEventListener('click', handleClick);
+  root.addEventListener('input', handleInput);
   renderEmpty();
 
   return {
@@ -163,9 +274,8 @@ export function mountInspector(
     updateAssemblyState(nextState) {
       currentAssemblyState = nextState;
       if (!currentPartId) return;
-      const progress = Math.round((currentAssemblyState.progress[currentPartId] ?? 0) * 100);
-      const progressLabel = content.querySelector<HTMLElement>('[data-testid="part-progress"]');
-      if (progressLabel) progressLabel.textContent = `${progress}%`;
+      updateProgressElements();
+      updateDependencyWarning();
     },
     setActionState(actionState) {
       const mappings = [
@@ -181,6 +291,7 @@ export function mountInspector(
     },
     dispose() {
       root.removeEventListener('click', handleClick);
+      root.removeEventListener('input', handleInput);
       root.remove();
     },
   };

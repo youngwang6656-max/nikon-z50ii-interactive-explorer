@@ -6,6 +6,8 @@ import {
   MeshStandardMaterial,
   Object3D,
   PerspectiveCamera,
+  Ray,
+  Scene,
   Texture,
   Vector3,
 } from 'three';
@@ -33,6 +35,27 @@ function fakeShell(): AppShell {
 
 class FakeControls extends EventDispatcher<{ start: object }> {
   readonly target = new Vector3();
+  enabled = true;
+}
+
+function canvasStub(): HTMLCanvasElement {
+  return {
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    setPointerCapture: vi.fn(),
+    releasePointerCapture: vi.fn(),
+    getBoundingClientRect: () => ({
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 100,
+      right: 200,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }),
+  } as unknown as HTMLCanvasElement;
 }
 
 function fakeViewer(): Viewer {
@@ -245,5 +268,73 @@ describe('createApp lifecycle', () => {
     app.dispose();
     expect(cancelFrame).toHaveBeenCalledWith(41);
     expect(timeline.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('coordinates free drag history, undo/reset, and guided-mode drag cancellation', async () => {
+    const manifest = parseManifest({
+      ...fixture,
+      modules: fixture.modules.map((module) => ({ ...module, preload: false })),
+    });
+    const shell = fakeShell();
+    Object.defineProperty(shell, 'timelinePanel', { value: {} as HTMLElement });
+    const part = new Object3D();
+    const controls = new FakeControls();
+    const camera = new PerspectiveCamera(45, 2, 0.01, 10);
+    camera.position.set(0, 1, 0);
+    camera.lookAt(0, 0, 0);
+    const viewer = {
+      ...fakeViewer(),
+      renderer: { domElement: canvasStub() },
+      scene: new Scene(),
+      camera,
+      controls,
+      partIndex: new Map([[manifest.parts[0]!.partId, part]]),
+    } as unknown as Viewer;
+    let callbacks: TimelineCallbacks | undefined;
+    let timelineMode: 'guided' | 'free' = 'guided';
+    const timeline: TimelineController = {
+      root: {} as HTMLElement,
+      get mode() { return timelineMode; },
+      render: vi.fn(),
+      setMode: vi.fn((mode) => { timelineMode = mode; }),
+      dispose: vi.fn(),
+    };
+    const app = await createApp({} as HTMLElement, {
+      loadManifest: async () => manifest,
+      mountShell: () => shell,
+      createViewer: () => viewer,
+      createModuleLoader: () => new ModuleLoader(manifest, async () => { throw new Error('unused'); }),
+      mountTimeline: (_host, _manifest, value) => {
+        callbacks = value;
+        return timeline;
+      },
+    });
+    const partId = manifest.parts[0]!.partId;
+    callbacks!.onModeChange('free');
+    const startRay = new Ray(new Vector3(0, 1, 0), new Vector3(0, -1, 0));
+    app.axisDragController!.begin(partId, startRay, 31);
+    app.axisDragController!.update(new Ray(new Vector3(0, 1, 0.02), new Vector3(0, -1, 0)));
+    app.axisDragController!.end();
+
+    expect(app.assemblyState.progress[partId]).toBe(0.5);
+    expect(app.assemblyState.history).toEqual([{ partId, from: 0, to: 0.5 }]);
+    app.undoLastMove();
+    expect(app.assemblyState.progress[partId]).toBe(0);
+    expect(app.assemblyState.history).toEqual([]);
+
+    app.axisDragController!.begin(partId, startRay, 32);
+    app.axisDragController!.update(new Ray(new Vector3(0, 1, 0.03), new Vector3(0, -1, 0)));
+    app.axisDragController!.end();
+    app.resetAssembly();
+    expect(Object.values(app.assemblyState.progress)).toEqual([0, 0]);
+    expect(app.assemblyState.history).toEqual([]);
+
+    app.axisDragController!.begin(partId, startRay, 33);
+    app.axisDragController!.update(new Ray(new Vector3(0, 1, 0.01), new Vector3(0, -1, 0)));
+    callbacks!.onModeChange('guided');
+    expect(app.axisDragController!.isDragging).toBe(false);
+    expect(controls.enabled).toBe(true);
+    expect(app.assemblyState.history).toEqual([]);
+    app.dispose();
   });
 });

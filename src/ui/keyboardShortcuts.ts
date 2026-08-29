@@ -4,7 +4,23 @@ function isEditingTarget(target: EventTarget | null): boolean {
   const tagName = typeof candidate.tagName === 'string'
     ? candidate.tagName.toUpperCase()
     : '';
-  return tagName === 'INPUT' || tagName === 'TEXTAREA' || candidate.isContentEditable === true;
+  return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT'
+    || candidate.isContentEditable === true;
+}
+
+export function handleUndoShortcut(
+  event: KeyboardEvent,
+  undo: () => void,
+): boolean {
+  if (
+    event.key.toLocaleLowerCase() !== 'z'
+    || (!event.ctrlKey && !event.metaKey)
+    || event.shiftKey
+    || isEditingTarget(event.target)
+  ) return false;
+  event.preventDefault();
+  undo();
+  return true;
 }
 
 export function handleSelectionShortcut(

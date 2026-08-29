@@ -86,6 +86,11 @@ export function mountTimeline(
   freeOption.value = 'free';
   modeSelect.append(guidedOption, freeOption);
   modeLabel.append(modeSelect);
+  const freeMode = element('button', 'timeline-button timeline-free-mode', '自由拆解');
+  freeMode.type = 'button';
+  freeMode.dataset.testid = 'mode-free';
+  freeMode.setAttribute('aria-label', '切换到自由拖拽拆解模式');
+  freeMode.setAttribute('aria-pressed', 'false');
 
   const previous = element('button', 'timeline-button timeline-previous', '上一步');
   previous.type = 'button';
@@ -130,7 +135,7 @@ export function mountTimeline(
   explode.setAttribute('aria-label', '整体爆炸进度');
   explodeLabel.append(explode);
 
-  controls.append(modeLabel, previous, play, next, stepCopy, progressLabel, explodeLabel);
+  controls.append(modeLabel, freeMode, previous, play, next, stepCopy, progressLabel, explodeLabel);
   root.append(heading, controls);
   host.replaceChildren(root);
 
@@ -139,6 +144,7 @@ export function mountTimeline(
   root.dataset.mode = currentMode;
   const applyControlState = (): void => {
     const free = currentMode === 'free';
+    freeMode.setAttribute('aria-pressed', String(free));
     play.disabled = free;
     progress.disabled = free;
     previous.disabled = free || (lastSnapshot?.normalizedTime ?? 0) <= 0;
@@ -151,11 +157,20 @@ export function mountTimeline(
     callbacks.onModeChange(currentMode);
   };
   const handlePlay = (): void => callbacks.onTogglePlay();
+  const handleFreeMode = (): void => {
+    if (currentMode === 'free') return;
+    currentMode = 'free';
+    modeSelect.value = 'free';
+    root.dataset.mode = currentMode;
+    applyControlState();
+    callbacks.onModeChange(currentMode);
+  };
   const handlePrevious = (): void => callbacks.onPrevious();
   const handleNext = (): void => callbacks.onNext();
   const handleSeek = (): void => callbacks.onSeek(Number(progress.value) / 1000);
   const handleGlobalExplode = (): void => callbacks.onGlobalExplode(Number(explode.value) / 1000);
   modeSelect.addEventListener('change', handleModeChange);
+  freeMode.addEventListener('click', handleFreeMode);
   play.addEventListener('click', handlePlay);
   previous.addEventListener('click', handlePrevious);
   next.addEventListener('click', handleNext);
@@ -192,6 +207,7 @@ export function mountTimeline(
     dispose() {
       if (disposed) return;
       modeSelect.removeEventListener('change', handleModeChange);
+      freeMode.removeEventListener('click', handleFreeMode);
       play.removeEventListener('click', handlePlay);
       previous.removeEventListener('click', handlePrevious);
       next.removeEventListener('click', handleNext);
