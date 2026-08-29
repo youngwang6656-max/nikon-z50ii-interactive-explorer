@@ -85,6 +85,85 @@ describe('guided sequence', () => {
     expect(tinyChunks.snapshot().isPlaying).toBe(false);
   });
 
+  it('preserves fractional time across the exact reviewer partitions', () => {
+    const oneChunk = new GuidedSequence(manifest, createAssemblyState(manifest), { stepDurationMs: 100 });
+    const twoChunks = new GuidedSequence(manifest, createAssemblyState(manifest), { stepDurationMs: 100 });
+    oneChunk.play();
+    twoChunks.play();
+
+    oneChunk.tick(16.6667);
+    twoChunks.tick(8.33335);
+    twoChunks.tick(8.33335);
+
+    expect(twoChunks.snapshot().normalizedTime).toBe(oneChunk.snapshot().normalizedTime);
+    expect(twoChunks.snapshot().assembly.progress).toEqual(oneChunk.snapshot().assembly.progress);
+    expect(twoChunks.snapshot().isPlaying).toBe(oneChunk.snapshot().isPlaying);
+  });
+
+  it('does not auto-pause before fractional ticks truly reach the endpoint', () => {
+    const oneStep = singleStepManifest();
+    const sequence = new GuidedSequence(oneStep, createAssemblyState(oneStep), { stepDurationMs: 1_000 });
+    sequence.play();
+
+    for (let index = 0; index < 1_500; index += 1) sequence.tick(0.6666665);
+
+    expect(sequence.snapshot().normalizedTime).toBeLessThan(1);
+    expect(sequence.snapshot().isPlaying).toBe(true);
+    sequence.tick(0.00025);
+    expect(sequence.snapshot().normalizedTime).toBe(1);
+    expect(sequence.snapshot().isPlaying).toBe(false);
+  });
+
+  it('keeps varied partitions equivalent at a step boundary and the endpoint', () => {
+    const partitionTenthsOfMicrosecond = (total: number, seed: number): number[] => {
+      const chunks: number[] = [];
+      let remaining = total;
+      let value = seed >>> 0;
+      while (remaining > 0) {
+        value = (Math.imul(value, 1_664_525) + 1_013_904_223) >>> 0;
+        const amount = Math.min(remaining, 1 + (value % 1_000_000));
+        chunks.push(amount / 10_000);
+        remaining -= amount;
+      }
+      return chunks;
+    };
+    const compareAt = (milliseconds: number, tenthsOfMicrosecond: number): void => {
+      const single = new GuidedSequence(manifest, createAssemblyState(manifest), { stepDurationMs: 100 });
+      const partitioned = new GuidedSequence(manifest, createAssemblyState(manifest), { stepDurationMs: 100 });
+      single.play();
+      partitioned.play();
+      single.tick(milliseconds);
+      partitionTenthsOfMicrosecond(tenthsOfMicrosecond, 0x5a17).forEach((chunk) => partitioned.tick(chunk));
+
+      expect(partitioned.snapshot().normalizedTime).toBe(single.snapshot().normalizedTime);
+      expect(partitioned.snapshot().assembly.progress).toEqual(single.snapshot().assembly.progress);
+      expect(partitioned.snapshot().isPlaying).toBe(single.snapshot().isPlaying);
+    };
+
+    compareAt(100, 1_000_000);
+    compareAt(4_000, 40_000_000);
+  });
+
+  it('resets fractional remainder on seek and preserves it across pause and state replacement', () => {
+    const sequence = new GuidedSequence(manifest, createAssemblyState(manifest), { stepDurationMs: 100 });
+    sequence.play();
+    sequence.tick(0.0006);
+    sequence.seek(0);
+    sequence.tick(0.0004);
+    expect(sequence.snapshot().normalizedTime).toBe(0.4 / 4_000_000);
+
+    sequence.seek(0);
+    sequence.play();
+    sequence.tick(0.0006);
+    sequence.pause();
+    sequence.replaceAssemblyState(sequence.snapshot().assembly);
+    sequence.play();
+    sequence.tick(Number.NaN);
+    sequence.tick(-20);
+    sequence.tick(0.0004);
+    expect(sequence.snapshot().normalizedTime).toBe(1 / 4_000_000);
+  });
+
   it('pauses without advancing and clamps seek values', () => {
     const sequence = new GuidedSequence(manifest, createAssemblyState(manifest));
     sequence.play();

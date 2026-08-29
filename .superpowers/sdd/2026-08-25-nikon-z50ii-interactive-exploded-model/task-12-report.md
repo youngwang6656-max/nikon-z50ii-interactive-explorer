@@ -138,3 +138,20 @@ Evidence:
 - Focused Task 12 browser test passed after the interaction-mode expectation was aligned with the authoritative contract.
 - Final full browser regression: **2 / 2 passed** (Task 11 plus Task 12), with zero browser/page console errors and clean owned-preview shutdown.
 - After that E2E regenerated prior screenshots, both Task 11 images were restored again and their Git object hashes matched base `2b3f4c6` exactly.
+
+## Fix Round 2 (reviewed commit `55e2e34`)
+
+### Partition-invariant fractional timing
+
+- Reproduced the remaining per-call quantization bug: one `tick(16.6667)` recorded 16,667 µs, while two `tick(8.33335)` calls recorded 16,666 µs. Repeating `tick(0.6666665)` also rounded every call upward and could auto-pause before the true accumulated duration reached the endpoint.
+- Playback now stores cumulative whole microseconds plus a fractional-microsecond carry. Each new delta is merged into that carry before whole-microsecond extraction, rather than rounded independently.
+- Fractional carry is stabilized at `1e-9` µs precision (one femtosecond). A value within that defined precision of the next whole microsecond carries forward deterministically.
+- Published normalized time includes the stabilized fraction, while the endpoint clamps to exact `1`, clears the fraction, and auto-pauses only when cumulative elapsed time reaches the duration at the defined precision.
+- Seek establishes a new exact accumulator and resets prior carry. Play and pause preserve carry. Assembly-state replacement preserves timeline carry. Negative, zero, and non-finite ticks leave both whole and fractional elapsed state untouched.
+
+### Fix-round tests
+
+- Added the exact reviewer partition pair (`16.6667` versus `8.33335 + 8.33335`).
+- Added 1,500 × `0.6666665` ms to prove playback remains active at 999.99975 ms, then reaches exact completion only after the remaining 0.00025 ms.
+- Added deterministic varied partitions generated in tenths of a microsecond and compared normalized time, all part progress, and playback state at a 100 ms step boundary and the 4,000 ms endpoint.
+- Added seek-reset plus pause/play/replace/invalid-delta accumulator semantics coverage.

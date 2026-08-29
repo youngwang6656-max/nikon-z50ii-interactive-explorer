@@ -17,6 +17,10 @@ export interface GuidedSequenceSnapshot {
 
 const DEFAULT_STEP_DURATION_MS = 1_250;
 const BOUNDARY_EPSILON = 1e-10;
+// Keep sub-microsecond carry at femtosecond precision. Published time uses
+// the cumulative whole+fraction pair, so partitioning does not round every
+// incoming delta independently.
+const FRACTIONAL_MICROSECOND_SCALE = 1_000_000_000;
 
 function clamp01(value: number): number {
   if (Number.isNaN(value) || value === Number.NEGATIVE_INFINITY) return 0;
@@ -117,6 +121,7 @@ export class GuidedSequence {
   private state: AssemblyState;
   private normalizedTime = 0;
   private elapsedMicroseconds = 0;
+  private fractionalMicroseconds = 0;
   private playing = false;
 
   constructor(
@@ -181,27 +186,47 @@ export class GuidedSequence {
       return;
     }
     this.normalizedTime = clamp01(requestedTime);
-    this.elapsedMicroseconds = Math.round(
-      this.normalizedTime * this.totalDurationMicroseconds,
+    const exactMicroseconds = this.normalizedTime * this.totalDurationMicroseconds;
+    this.elapsedMicroseconds = Math.floor(exactMicroseconds);
+    this.fractionalMicroseconds = this.stableFraction(
+      exactMicroseconds - this.elapsedMicroseconds,
     );
+    if (this.fractionalMicroseconds >= 1) {
+      this.elapsedMicroseconds += 1;
+      this.fractionalMicroseconds = 0;
+    }
+    this.updateNormalizedTime();
     this.applyTimeToAssembly();
     if (this.normalizedTime >= 1) this.playing = false;
   }
 
   tick(milliseconds: number): void {
     if (!this.playing || !Number.isFinite(milliseconds) || milliseconds <= 0) return;
-    const increment = Math.round(milliseconds * 1_000);
-    if (increment <= 0) return;
-    this.elapsedMicroseconds = Math.min(
-      this.totalDurationMicroseconds,
-      this.elapsedMicroseconds + increment,
-    );
-    this.normalizedTime = this.totalDurationMicroseconds === 0
-      ? 0
-      : this.elapsedMicroseconds / this.totalDurationMicroseconds;
+    const deltaMicroseconds = milliseconds * 1_000;
+    if (deltaMicroseconds <= 0) return;
+    if (deltaMicroseconds >= this.totalDurationMicroseconds) {
+      this.elapsedMicroseconds = this.totalDurationMicroseconds;
+      this.fractionalMicroseconds = 0;
+    } else {
+      const wholeDelta = Math.floor(deltaMicroseconds);
+      const fractionalDelta = deltaMicroseconds - wholeDelta;
+      const combinedFraction = this.stableFraction(
+        this.fractionalMicroseconds + fractionalDelta,
+      );
+      const carry = Math.floor(combinedFraction);
+      this.elapsedMicroseconds = Math.min(
+        this.totalDurationMicroseconds,
+        this.elapsedMicroseconds + wholeDelta + carry,
+      );
+      this.fractionalMicroseconds = this.elapsedMicroseconds >= this.totalDurationMicroseconds
+        ? 0
+        : combinedFraction - carry;
+    }
+    this.updateNormalizedTime();
     this.applyTimeToAssembly();
     if (this.elapsedMicroseconds >= this.totalDurationMicroseconds) {
       this.normalizedTime = 1;
+      this.fractionalMicroseconds = 0;
       this.playing = false;
     }
   }
@@ -271,5 +296,17 @@ export class GuidedSequence {
       nextProgress[part.partId] = desiredProgress.get(part.partId) ?? 0;
     });
     this.state = { ...this.state, progress: nextProgress };
+  }
+
+  private stableFraction(value: number): number {
+    return Math.round(value * FRACTIONAL_MICROSECOND_SCALE)
+      / FRACTIONAL_MICROSECOND_SCALE;
+  }
+
+  private updateNormalizedTime(): void {
+    this.normalizedTime = this.totalDurationMicroseconds === 0
+      ? 0
+      : (this.elapsedMicroseconds + this.fractionalMicroseconds)
+        / this.totalDurationMicroseconds;
   }
 }
