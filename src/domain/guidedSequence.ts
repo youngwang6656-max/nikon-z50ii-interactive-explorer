@@ -17,10 +17,6 @@ export interface GuidedSequenceSnapshot {
 
 const DEFAULT_STEP_DURATION_MS = 1_250;
 const BOUNDARY_EPSILON = 1e-10;
-// Keep sub-microsecond carry at femtosecond precision. Published time uses
-// the cumulative whole+fraction pair, so partitioning does not round every
-// incoming delta independently.
-const FRACTIONAL_MICROSECOND_SCALE = 1_000_000_000;
 
 function clamp01(value: number): number {
   if (Number.isNaN(value) || value === Number.NEGATIVE_INFINITY) return 0;
@@ -118,10 +114,12 @@ export class GuidedSequence {
   private readonly snapshotManifest: AssemblyManifest;
   private readonly stepDurationMs: number;
   private readonly totalDurationMicroseconds: number;
+  private readonly totalDurationMilliseconds: number;
   private state: AssemblyState;
   private normalizedTime = 0;
-  private elapsedMicroseconds = 0;
-  private fractionalMicroseconds = 0;
+  // Accumulate the caller's millisecond deltas without per-tick rounding.
+  // Only the published timeline is quantized, once, to an integer microsecond.
+  private elapsedMilliseconds = 0;
   private playing = false;
 
   constructor(
@@ -142,6 +140,7 @@ export class GuidedSequence {
     this.totalDurationMicroseconds = Math.round(
       this.steps.length * this.stepDurationMs * 1_000,
     );
+    this.totalDurationMilliseconds = this.totalDurationMicroseconds / 1_000;
     this.state = {
       manifest,
       progress: Object.fromEntries(
@@ -182,19 +181,11 @@ export class GuidedSequence {
   seek(requestedTime: number): void {
     if (this.steps.length === 0) {
       this.normalizedTime = 0;
+      this.elapsedMilliseconds = 0;
       this.playing = false;
       return;
     }
-    this.normalizedTime = clamp01(requestedTime);
-    const exactMicroseconds = this.normalizedTime * this.totalDurationMicroseconds;
-    this.elapsedMicroseconds = Math.floor(exactMicroseconds);
-    this.fractionalMicroseconds = this.stableFraction(
-      exactMicroseconds - this.elapsedMicroseconds,
-    );
-    if (this.fractionalMicroseconds >= 1) {
-      this.elapsedMicroseconds += 1;
-      this.fractionalMicroseconds = 0;
-    }
+    this.elapsedMilliseconds = clamp01(requestedTime) * this.totalDurationMilliseconds;
     this.updateNormalizedTime();
     this.applyTimeToAssembly();
     if (this.normalizedTime >= 1) this.playing = false;
@@ -202,31 +193,15 @@ export class GuidedSequence {
 
   tick(milliseconds: number): void {
     if (!this.playing || !Number.isFinite(milliseconds) || milliseconds <= 0) return;
-    const deltaMicroseconds = milliseconds * 1_000;
-    if (deltaMicroseconds <= 0) return;
-    if (deltaMicroseconds >= this.totalDurationMicroseconds) {
-      this.elapsedMicroseconds = this.totalDurationMicroseconds;
-      this.fractionalMicroseconds = 0;
-    } else {
-      const wholeDelta = Math.floor(deltaMicroseconds);
-      const fractionalDelta = deltaMicroseconds - wholeDelta;
-      const combinedFraction = this.stableFraction(
-        this.fractionalMicroseconds + fractionalDelta,
-      );
-      const carry = Math.floor(combinedFraction);
-      this.elapsedMicroseconds = Math.min(
-        this.totalDurationMicroseconds,
-        this.elapsedMicroseconds + wholeDelta + carry,
-      );
-      this.fractionalMicroseconds = this.elapsedMicroseconds >= this.totalDurationMicroseconds
-        ? 0
-        : combinedFraction - carry;
-    }
+    this.elapsedMilliseconds = Math.min(
+      this.totalDurationMilliseconds,
+      this.elapsedMilliseconds + milliseconds,
+    );
     this.updateNormalizedTime();
     this.applyTimeToAssembly();
-    if (this.elapsedMicroseconds >= this.totalDurationMicroseconds) {
+    if (this.normalizedTime >= 1) {
       this.normalizedTime = 1;
-      this.fractionalMicroseconds = 0;
+      this.elapsedMilliseconds = this.totalDurationMilliseconds;
       this.playing = false;
     }
   }
@@ -298,15 +273,15 @@ export class GuidedSequence {
     this.state = { ...this.state, progress: nextProgress };
   }
 
-  private stableFraction(value: number): number {
-    return Math.round(value * FRACTIONAL_MICROSECOND_SCALE)
-      / FRACTIONAL_MICROSECOND_SCALE;
-  }
-
   private updateNormalizedTime(): void {
-    this.normalizedTime = this.totalDurationMicroseconds === 0
-      ? 0
-      : (this.elapsedMicroseconds + this.fractionalMicroseconds)
-        / this.totalDurationMicroseconds;
+    if (this.totalDurationMicroseconds === 0) {
+      this.normalizedTime = 0;
+      return;
+    }
+    const publishedMicroseconds = Math.min(
+      this.totalDurationMicroseconds,
+      Math.round(this.elapsedMilliseconds * 1_000),
+    );
+    this.normalizedTime = publishedMicroseconds / this.totalDurationMicroseconds;
   }
 }

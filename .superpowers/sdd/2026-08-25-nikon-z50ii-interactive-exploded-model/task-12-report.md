@@ -155,3 +155,21 @@ Evidence:
 - Added 1,500 × `0.6666665` ms to prove playback remains active at 999.99975 ms, then reaches exact completion only after the remaining 0.00025 ms.
 - Added deterministic varied partitions generated in tenths of a microsecond and compared normalized time, all part progress, and playback state at a 100 ms step boundary and the 4,000 ms endpoint.
 - Added seek-reset plus pause/play/replace/invalid-delta accumulator semantics coverage.
+
+## Fix Round 3 (reviewed commit `2b5814d`)
+
+### Cumulative-time authority and published quantum
+
+- Reproduced the residual partition dependence with `[909.962542, 209.823401, 992.713704]`: stabilizing fractional carry after every tick still made the number of ticks affect the result.
+- Playback now has one raw cumulative-elapsed-milliseconds authority. Tick deltas are added without per-call quantization, so a chunk sequence and one tick receiving the same JavaScript-computed sum perform the same floating-point additions before publication.
+- The public timeline and derived assembly state are quantized once from cumulative elapsed time to the nearest integer microsecond. Differences below this explicit one-microsecond publication quantum are intentionally not observable.
+- Seek replaces the cumulative elapsed value. Pause/play and assembly-state replacement preserve it. Invalid or non-positive ticks do not mutate it. Reaching the published duration clamps normalized time to exact `1`, clamps elapsed time to the duration, and auto-pauses.
+
+### Fix-round tests
+
+- Added the exact three-chunk reviewer reproduction and asserted the published `2,112,500 / 4,000,000` normalized time plus complete snapshot equality with one tick receiving the JavaScript-computed sum.
+- Updated deterministic varied-partition coverage so its comparison tick receives each partition array's JavaScript-computed sum at a step boundary and at the endpoint; normalized time, all part progress, and playback state must be exactly equal.
+- Added 5,998 × `0.6666665` ms no-early-pause coverage, followed by the exact computed remainder to verify exact endpoint clamp and auto-pause.
+- Updated seek/pause/play/replacement/invalid-tick coverage for the integer-microsecond publication contract.
+
+Verification: focused GuidedSequence suite **15 / 15 passed**; full check **14 files / 76 tests passed**, TypeScript passed, and the production Vite build passed. The pre-existing large-chunk advisory remains non-blocking.
