@@ -260,10 +260,48 @@ describe('createApp lifecycle', () => {
     expect(app.guidedPlaybackActive).toBe(true);
     expect(app.freeDragEnabled).toBe(false);
     expect(frameCallback).toBeTypeOf('function');
-    frameCallback!(100);
+    const pendingModeFrame = frameCallback!;
+    const progressBeforeFreeMode = { ...app.assemblyState.progress };
+    const matrixBeforeFreeMode = [...part.matrix.elements];
+    const publicationsBeforeFreeMode = (
+      shell.root.setAttribute as ReturnType<typeof vi.fn>
+    ).mock.calls.length;
+    callbacks!.onModeChange('free');
+    expect(shell.root.setAttribute).toHaveBeenCalledTimes(publicationsBeforeFreeMode + 1);
+    expect(shell.root.dataset.interactionMode).toBe('free');
+    expect(shell.root.dataset.guidedPlaybackActive).toBe('false');
+    expect(shell.root.dataset.freeDragEnabled).toBe('true');
+    expect(shell.root.dataset.cameraTweenActive).toBe('false');
+    expect(timelineMode).toBe('free');
+    expect(app.freeDragEnabled).toBe(true);
+    expect(app.guidedPlaybackActive).toBe(false);
+    expect(app.assemblyState.progress).toEqual(progressBeforeFreeMode);
+    expect(app.assemblyState.history).toEqual([]);
+    expect(part.matrix.elements).toEqual(matrixBeforeFreeMode);
+    const publicationsAfterFreeMode = (
+      shell.root.setAttribute as ReturnType<typeof vi.fn>
+    ).mock.calls.length;
+    pendingModeFrame(100);
+    expect(shell.root.setAttribute).toHaveBeenCalledTimes(publicationsAfterFreeMode);
+    expect(app.assemblyState.progress).toEqual(progressBeforeFreeMode);
+    expect(part.matrix.elements).toEqual(matrixBeforeFreeMode);
+
+    callbacks!.onModeChange('guided');
+    callbacks!.onTogglePlay();
+    expect(app.guidedPlaybackActive).toBe(true);
+    const pendingPublicCancelFrame = frameCallback!;
+    const publicationsBeforePublicCancel = (
+      shell.root.setAttribute as ReturnType<typeof vi.fn>
+    ).mock.calls.length;
     app.cancelGuidedPlayback();
+    expect(shell.root.setAttribute).toHaveBeenCalledTimes(publicationsBeforePublicCancel + 1);
     expect(app.guidedPlaybackActive).toBe(false);
     expect(app.freeDragEnabled).toBe(false);
+    const publicationsAfterPublicCancel = (
+      shell.root.setAttribute as ReturnType<typeof vi.fn>
+    ).mock.calls.length;
+    pendingPublicCancelFrame(200);
+    expect(shell.root.setAttribute).toHaveBeenCalledTimes(publicationsAfterPublicCancel);
 
     app.dispose();
     expect(cancelFrame).toHaveBeenCalledWith(41);

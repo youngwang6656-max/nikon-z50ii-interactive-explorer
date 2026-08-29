@@ -129,6 +129,7 @@ export async function createApp(
     ? new CameraPresetTween(viewer.camera, viewer.controls, { reducedMotion })
     : null;
   let animationFrameId: number | null = null;
+  let animationGeneration = 0;
   let previousFrameTime: number | null = null;
   let publishedProgress = 0;
   let interactionMode: TimelineMode = 'guided';
@@ -325,9 +326,9 @@ export async function createApp(
     if (preset) cameraTween?.start(preset);
   };
 
-  const runAnimationFrame = (timestamp: number): void => {
+  const runAnimationFrame = (timestamp: number, generation: number): void => {
+    if (generation !== animationGeneration || disposed) return;
     animationFrameId = null;
-    if (disposed) return;
     const delta = previousFrameTime === null ? 0 : Math.max(0, timestamp - previousFrameTime);
     previousFrameTime = timestamp;
     const sequenceWasPlaying = guidedSequence.snapshot().isPlaying;
@@ -337,7 +338,9 @@ export async function createApp(
     if (guidedSequence.snapshot().activeStepIndex !== previousStepIndex) startCurrentCameraPreset();
     publishSequence(sequenceWasPlaying ? guidedSequence.snapshot().normalizedTime : undefined);
     if (guidedSequence.snapshot().isPlaying || cameraTween?.active) {
-      animationFrameId = requestFrame(runAnimationFrame);
+      animationFrameId = requestFrame((nextTimestamp) => {
+        runAnimationFrame(nextTimestamp, generation);
+      });
     } else {
       previousFrameTime = null;
     }
@@ -346,13 +349,24 @@ export async function createApp(
   const ensureAnimationFrame = (): void => {
     if (disposed || animationFrameId !== null) return;
     previousFrameTime = null;
-    animationFrameId = requestFrame(runAnimationFrame);
+    const generation = animationGeneration;
+    animationFrameId = requestFrame((timestamp) => {
+      runAnimationFrame(timestamp, generation);
+    });
+  };
+
+  const stopGuidedMotion = (): AssemblyState => {
+    guidedSequence.pause();
+    cameraTween?.cancel();
+    animationGeneration += 1;
+    if (animationFrameId !== null) cancelFrame(animationFrameId);
+    animationFrameId = null;
+    previousFrameTime = null;
+    return cloneAssemblyState(guidedSequence.snapshot().assembly);
   };
 
   const cancelGuidedPlayback = (): void => {
-    guidedSequence.pause();
-    cameraTween?.cancel();
-    previousFrameTime = null;
+    stopGuidedMotion();
     publishSequence();
   };
 
@@ -479,18 +493,22 @@ export async function createApp(
   if (shell.timelinePanel) {
     timeline = (dependencies.mountTimeline ?? mountTimeline)(shell.timelinePanel, manifest, {
       onModeChange(mode) {
-        const baseline = mode === 'guided' ? abortAllFreeGestures() : assemblyState;
-        if (mode === 'free') cancelGuidedPlayback();
-        interactionMode = mode;
-        inspector?.setFreeMode(mode === 'free');
-        timeline?.setMode(mode);
-        if (mode === 'free') publishFreeAssembly(assemblyState);
-        else {
-          assemblyState = baseline;
-          publishedProgress = averageProgress(baseline);
-          guidedSequence.replaceAssemblyState(baseline);
-          seekGuided(publishedProgress);
+        if (mode === 'free') {
+          const currentAssembly = stopGuidedMotion();
+          interactionMode = mode;
+          inspector?.setFreeMode(true);
+          timeline?.setMode(mode);
+          publishFreeAssembly({ ...currentAssembly, history: [] });
+          return;
         }
+        const baseline = abortAllFreeGestures();
+        interactionMode = mode;
+        inspector?.setFreeMode(false);
+        timeline?.setMode(mode);
+        assemblyState = baseline;
+        publishedProgress = averageProgress(baseline);
+        guidedSequence.replaceAssemblyState(baseline);
+        seekGuided(publishedProgress);
       },
       onTogglePlay() {
         if (interactionMode !== 'guided') return;
@@ -528,9 +546,7 @@ export async function createApp(
       },
       onGlobalExplode(progress) {
         const baseline = abortAllFreeGestures();
-        guidedSequence.pause();
-        cameraTween?.cancel();
-        previousFrameTime = null;
+        stopGuidedMotion();
         assemblyState = {
           ...setGlobalExplode(baseline, progress),
           history: [],
@@ -597,6 +613,7 @@ export async function createApp(
       if (selectionController) document.removeEventListener('keydown', handleKeyDown);
       if (animationFrameId !== null) cancelFrame(animationFrameId);
       animationFrameId = null;
+      animationGeneration += 1;
       previousFrameTime = null;
       guidedSequence.pause();
       cameraTween?.dispose();

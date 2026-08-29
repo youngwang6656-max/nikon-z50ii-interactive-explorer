@@ -76,6 +76,14 @@ The existing Task 11 and Task 12 real-Chrome suites were rerun after the inspect
 
 The bundled runtime's `node` directory must be on `PATH` when invoking the pnpm wrapper in this shell; equivalent direct bundled-Node commands were used during iterative RED/GREEN runs.
 
+## Fix round 2 — Atomic guided-to-free transition
+
+- RED: the active-playback regression captured the pending RAF, current assembly progress, selected-part matrix, and root publication count. Guided→free expected one additional publication but received two (`expected 14, received 15`), proving that `cancelGuidedPlayback()` published before the mode handler published again.
+- GREEN: guided motion now has one internal non-publishing stop path. It pauses the sequence, cancels the camera tween and scheduled frame, clears frame timing, advances an animation generation, and returns a cloned authoritative guided assembly snapshot. Guided→free clears incompatible history, switches mode/inspector/timeline hooks, and publishes that snapshot once synchronously.
+- Every scheduled RAF closure captures its generation. A callback captured before cancellation or a mode transition returns before changing frame ownership, assembly, geometry, root attributes, or publication count. The regression manually invokes both the pre-transition callback and the pre-public-cancel callback to prove they are inert.
+- Public `cancelGuidedPlayback()` reuses the non-publishing stop path and then calls `publishSequence()` exactly once, preserving its external contract. Guided global explode also uses the stop path so a queued playback/camera frame cannot republish after the command.
+- Final gates: focused `tests/unit/createApp.test.ts` passed 4/4; `scripts/pnpm.ps1 check` passed 95/95 tests, TypeScript, and the production build; the three real-Chrome suites passed. Windows denied the runner's otherwise unused fixed port 4175 with `EACCES`, so the same runner/config were temporarily pointed at 4176 for the browser gate and restored immediately afterward with no tracked diff.
+
 ## Concerns
 
 - Vite continues to report the pre-existing advisory that the main minified chunk exceeds 500 kB. This does not fail the build and is unrelated to Task 13 behavior.
