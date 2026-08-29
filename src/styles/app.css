@@ -71,7 +71,7 @@ summary:focus-visible {
   grid-template:
     "header header header" 74px
     "assembly viewer inspector" minmax(0, 1fr)
-    "assembly timeline inspector" 104px /
+    "assembly timeline inspector" 142px /
     minmax(220px, 260px) minmax(420px, 1fr) minmax(250px, 300px);
   width: 100%;
   height: 100%;
@@ -427,57 +427,120 @@ summary:focus-visible {
 
 .timeline-panel {
   grid-area: timeline;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  padding: 14px 24px 16px;
+  min-width: 0;
+  padding: 10px 16px 12px;
   border-top: 1px solid var(--line);
   background: rgba(7, 12, 17, 0.95);
   z-index: 3;
 }
 
+.guided-timeline {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  height: 100%;
+}
+
 .timeline-heading {
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto 1fr auto;
   gap: 10px;
   align-items: center;
+}
+
+.timeline-heading-copy,
+.timeline-step-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
 }
 
 .timeline-count {
   justify-self: end;
 }
 
-.timeline-track {
-  position: relative;
-  align-self: center;
-  height: 1px;
-  background: rgba(105, 153, 172, 0.24);
+.timeline-step-en {
+  overflow: hidden;
+  color: #526a76;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.timeline-track::before,
-.timeline-track::after {
-  position: absolute;
-  top: -3px;
-  width: 7px;
-  height: 7px;
-  border: 1px solid #37505c;
+.timeline-controls {
+  display: grid;
+  grid-template-columns: auto auto auto auto minmax(110px, 0.8fr) minmax(150px, 1.35fr) minmax(118px, 0.9fr);
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+}
+
+.timeline-mode-label,
+.timeline-slider-label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.timeline-mode-label {
+  color: #78909b;
+  font-size: 8px;
+}
+
+.timeline-mode,
+.timeline-button {
+  min-height: 30px;
+  border: 1px solid rgba(53, 216, 255, 0.25);
+  border-radius: 2px;
+  color: #b9d0da;
   background: #081017;
-  content: "";
-  transform: rotate(45deg);
+  font-size: 9px;
 }
 
-.timeline-track::before {
-  left: 0;
+.timeline-mode {
+  max-width: 82px;
 }
 
-.timeline-track::after {
-  right: 0;
+.timeline-button {
+  padding: 0 8px;
+  cursor: pointer;
 }
 
-.timeline-progress {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 0;
-  background: var(--cyan);
+.timeline-button:hover,
+.timeline-button[aria-pressed="true"] {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.timeline-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.timeline-step-title {
+  overflow: hidden;
+  color: #c9dce4;
+  font-size: 10px;
+  font-weight: 540;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-slider-name {
+  color: #78909b;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+
+.timeline-slider {
+  width: 100%;
+  min-width: 0;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--cyan);
+  cursor: pointer;
 }
 
 .boot-failure {
@@ -515,7 +578,7 @@ summary:focus-visible {
       "header header" 68px
       "viewer viewer" minmax(360px, 1fr)
       "assembly inspector" minmax(190px, 30vh)
-      "timeline timeline" 92px /
+      "timeline timeline" 138px /
       1fr 1fr;
     overflow: auto;
   }
@@ -542,7 +605,7 @@ summary:focus-visible {
       "viewer" minmax(360px, 58vh)
       "assembly" auto
       "inspector" minmax(230px, auto)
-      "timeline" 88px /
+      "timeline" auto /
       1fr;
     min-height: 100%;
     height: auto;
@@ -569,6 +632,24 @@ summary:focus-visible {
   .timeline-panel {
     position: sticky;
     bottom: 0;
+    min-height: 174px;
+    padding: 10px 12px 12px;
+  }
+
+  .timeline-controls {
+    grid-template-columns: minmax(76px, 1fr) repeat(3, auto);
+  }
+
+  .timeline-step-copy {
+    grid-column: 1 / -1;
+  }
+
+  .timeline-slider-label {
+    grid-column: 1 / -1;
+  }
+
+  .timeline-mode {
+    max-width: none;
   }
 }
 

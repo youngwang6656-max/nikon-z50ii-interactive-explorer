@@ -7,6 +7,7 @@ export interface AppShell {
   readonly viewerHost: HTMLElement;
   readonly assemblyPanel?: HTMLElement;
   readonly inspectorPanel?: HTMLElement;
+  readonly timelinePanel?: HTMLElement;
   setModuleStatus(moduleId: string, status: ShellModuleStatus, error?: string): void;
   dispose(): void;
 }
@@ -137,6 +138,7 @@ export function mountAppShell(
     viewerHost,
     assemblyPanel: assemblyTree,
     inspectorPanel: inspector,
+    timelinePanel: timeline,
     setModuleStatus(moduleId, status, error) {
       const row = moduleList.querySelector<HTMLElement>(
         `[data-module-id="${CSS.escape(moduleId)}"]`,

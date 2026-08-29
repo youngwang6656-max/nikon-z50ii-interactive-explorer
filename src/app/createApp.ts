@@ -1,13 +1,17 @@
 import { parseManifest, type AssemblyManifest } from '../domain/manifest';
-import { createAssemblyState, type AssemblyState } from '../domain/assemblyState';
+import { createAssemblyState, setGlobalExplode, type AssemblyState } from '../domain/assemblyState';
+import { GuidedSequence } from '../domain/guidedSequence';
 import { mountAssemblyTree, type AssemblyTreeController } from '../ui/assemblyTree';
 import { mountAppShell, type AppShell } from '../ui/appShell';
 import { mountInspector, type InspectorController } from '../ui/inspector';
 import { handleSelectionShortcut } from '../ui/keyboardShortcuts';
+import { mountTimeline, type TimelineCallbacks, type TimelineController } from '../ui/timeline';
+import { CameraPresetTween } from '../viewer/cameraPresetTween';
 import { createViewer, type Viewer } from '../viewer/createRenderer';
 import { disposeObjectTree } from '../viewer/disposeObjectTree';
 import { ModuleLoader, type LoadedModule } from '../viewer/moduleLoader';
 import { PartDisplayController } from '../viewer/partDisplayController';
+import { GuidedPartTransforms } from '../viewer/guidedPartTransforms';
 import { SelectionController } from '../viewer/selectionController';
 
 export interface App {
@@ -19,7 +23,12 @@ export interface App {
   readonly selectionController: SelectionController | null;
   readonly assemblyTree: AssemblyTreeController | null;
   readonly inspector: InspectorController | null;
+  readonly timeline: TimelineController | null;
+  readonly guidedSequence: GuidedSequence;
+  readonly guidedPlaybackActive: boolean;
+  readonly freeDragEnabled: boolean;
   readonly preloadReady: Promise<void>;
+  cancelGuidedPlayback(): void;
   dispose(): void;
 }
 
@@ -28,6 +37,14 @@ export interface AppDependencies {
   mountShell?: (container: HTMLElement, manifest: AssemblyManifest) => AppShell;
   createViewer?: (container: HTMLElement) => Viewer;
   createModuleLoader?: (manifest: AssemblyManifest) => ModuleLoader;
+  mountTimeline?: (
+    host: HTMLElement,
+    manifest: AssemblyManifest,
+    callbacks: TimelineCallbacks,
+  ) => TimelineController;
+  requestAnimationFrame?: (callback: FrameRequestCallback) => number;
+  cancelAnimationFrame?: (handle: number) => void;
+  prefersReducedMotion?: () => boolean;
 }
 
 const PRELOAD_MODULE_IDS = new Set([
@@ -63,7 +80,9 @@ export async function createApp(
   const moduleLoader = (
     dependencies.createModuleLoader ?? ((value) => new ModuleLoader(value))
   )(manifest);
-  const assemblyState = createAssemblyState(manifest);
+  let assemblyState = createAssemblyState(manifest);
+  const guidedSequence = new GuidedSequence(manifest, assemblyState);
+  const guidedTransforms = new GuidedPartTransforms(manifest);
   let disposed = false;
 
   const mountedModuleIds = new Set<string>();
@@ -74,8 +93,21 @@ export async function createApp(
 
   let assemblyTree: AssemblyTreeController | null = null;
   let inspector: InspectorController | null = null;
+  let timeline: TimelineController | null = null;
   let selectionController: SelectionController | null = null;
   let selectionRequest = 0;
+  const requestFrame = dependencies.requestAnimationFrame
+    ?? ((callback: FrameRequestCallback) => window.requestAnimationFrame(callback));
+  const cancelFrame = dependencies.cancelAnimationFrame
+    ?? ((handle: number) => window.cancelAnimationFrame(handle));
+  const reducedMotion = dependencies.prefersReducedMotion?.()
+    ?? (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const cameraTween = viewer.camera && viewer.controls
+    ? new CameraPresetTween(viewer.camera, viewer.controls, { reducedMotion })
+    : null;
+  let animationFrameId: number | null = null;
+  let previousFrameTime: number | null = null;
+  let publishedProgress = 0;
 
   const setModuleStatus = (
     moduleId: string,
@@ -93,6 +125,7 @@ export async function createApp(
       mountedModuleIds.add(loaded.moduleId);
       assemblyTree?.setLoadProgress(mountedModuleIds.size, manifest.modules.length);
       displayController?.apply();
+      if (viewer.partIndex) guidedTransforms.apply(assemblyState, viewer.partIndex);
     } catch (error) {
       disposeObjectTree(loaded.root);
       throw error;
@@ -161,6 +194,80 @@ export async function createApp(
     assemblyTree?.setLoadProgress(mountedModuleIds.size, manifest.modules.length);
   };
 
+  const formatProgress = (value: number): string => {
+    if (value === 0 || value === 1) return String(value);
+    return String(Number(value.toFixed(6)));
+  };
+
+  const averageProgress = (state: AssemblyState): number => {
+    const values = manifest.parts.map((part) => state.progress[part.partId] ?? 0);
+    return values.length === 0
+      ? 0
+      : values.reduce((sum, value) => sum + value, 0) / values.length;
+  };
+
+  const publishSequence = (
+    progressAttribute?: number,
+    globalProgress = averageProgress(guidedSequence.snapshot().assembly),
+  ): void => {
+    if (progressAttribute !== undefined) publishedProgress = progressAttribute;
+    const snapshot = guidedSequence.snapshot();
+    assemblyState = snapshot.assembly;
+    shell.root.dataset.assemblyProgress = formatProgress(publishedProgress);
+    shell.root.setAttribute('data-assembly-progress', formatProgress(publishedProgress));
+    shell.root.dataset.guidedPlaybackActive = String(snapshot.isPlaying);
+    shell.root.dataset.freeDragEnabled = String(!snapshot.isPlaying);
+    shell.root.dataset.cameraTweenActive = String(cameraTween?.active ?? false);
+    guidedTransforms.apply(assemblyState, viewer.partIndex ?? new Map());
+    inspector?.updateAssemblyState(assemblyState);
+    timeline?.render(snapshot, globalProgress);
+  };
+
+  const startCurrentCameraPreset = (): void => {
+    const preset = guidedSequence.snapshot().currentStep?.cameraPreset;
+    if (preset) cameraTween?.start(preset);
+  };
+
+  const runAnimationFrame = (timestamp: number): void => {
+    animationFrameId = null;
+    if (disposed) return;
+    const delta = previousFrameTime === null ? 0 : Math.max(0, timestamp - previousFrameTime);
+    previousFrameTime = timestamp;
+    const sequenceWasPlaying = guidedSequence.snapshot().isPlaying;
+    const previousStepIndex = guidedSequence.snapshot().activeStepIndex;
+    guidedSequence.tick(delta);
+    cameraTween?.tick(delta);
+    if (guidedSequence.snapshot().activeStepIndex !== previousStepIndex) startCurrentCameraPreset();
+    publishSequence(sequenceWasPlaying ? guidedSequence.snapshot().normalizedTime : undefined);
+    if (guidedSequence.snapshot().isPlaying || cameraTween?.active) {
+      animationFrameId = requestFrame(runAnimationFrame);
+    } else {
+      previousFrameTime = null;
+    }
+  };
+
+  const ensureAnimationFrame = (): void => {
+    if (disposed || animationFrameId !== null) return;
+    previousFrameTime = null;
+    animationFrameId = requestFrame(runAnimationFrame);
+  };
+
+  const cancelGuidedPlayback = (): void => {
+    guidedSequence.pause();
+    cameraTween?.cancel();
+    previousFrameTime = null;
+    publishSequence();
+  };
+
+  const seekGuided = (normalizedTime: number): void => {
+    const previousStepIndex = guidedSequence.snapshot().activeStepIndex;
+    guidedSequence.seek(normalizedTime);
+    if (guidedSequence.snapshot().activeStepIndex !== previousStepIndex) startCurrentCameraPreset();
+    if (normalizedTime > 0) void loadAllModules();
+    publishSequence(guidedSequence.snapshot().normalizedTime);
+    if (cameraTween?.active) ensureAnimationFrame();
+  };
+
   if (
     shell.assemblyPanel &&
     shell.inspectorPanel &&
@@ -209,6 +316,50 @@ export async function createApp(
     assemblyTree.setLoadProgress(0, manifest.modules.length);
   }
 
+  if (shell.timelinePanel) {
+    timeline = (dependencies.mountTimeline ?? mountTimeline)(shell.timelinePanel, manifest, {
+      onModeChange(mode) {
+        if (mode === 'free') cancelGuidedPlayback();
+      },
+      onTogglePlay() {
+        if (guidedSequence.snapshot().isPlaying) {
+          cancelGuidedPlayback();
+          return;
+        }
+        if (guidedSequence.snapshot().normalizedTime >= 1) guidedSequence.seek(0);
+        guidedSequence.play();
+        startCurrentCameraPreset();
+        void loadAllModules();
+        publishSequence(guidedSequence.snapshot().normalizedTime);
+        ensureAnimationFrame();
+      },
+      onPrevious() {
+        const previousStepIndex = guidedSequence.snapshot().activeStepIndex;
+        guidedSequence.previous();
+        if (guidedSequence.snapshot().activeStepIndex !== previousStepIndex) startCurrentCameraPreset();
+        publishSequence(guidedSequence.snapshot().normalizedTime);
+        if (cameraTween?.active) ensureAnimationFrame();
+      },
+      onNext() {
+        const previousStepIndex = guidedSequence.snapshot().activeStepIndex;
+        guidedSequence.next();
+        if (guidedSequence.snapshot().activeStepIndex !== previousStepIndex) startCurrentCameraPreset();
+        void loadAllModules();
+        publishSequence(guidedSequence.snapshot().normalizedTime);
+        if (cameraTween?.active) ensureAnimationFrame();
+      },
+      onSeek: seekGuided,
+      onGlobalExplode(progress) {
+        guidedSequence.pause();
+        cameraTween?.cancel();
+        assemblyState = setGlobalExplode(assemblyState, progress);
+        guidedSequence.replaceAssemblyState(assemblyState);
+        publishSequence(progress, progress);
+      },
+    });
+    publishSequence(0);
+  }
+
   const handleKeyDown = (event: KeyboardEvent): void => {
     handleSelectionShortcut(
       event,
@@ -234,16 +385,27 @@ export async function createApp(
     shell,
     viewer,
     moduleLoader,
-    assemblyState,
+    get assemblyState() { return assemblyState; },
     selectionController,
     assemblyTree,
     inspector,
+    timeline,
+    guidedSequence,
+    get guidedPlaybackActive() { return guidedSequence.snapshot().isPlaying; },
+    get freeDragEnabled() { return !guidedSequence.snapshot().isPlaying; },
     preloadReady,
+    cancelGuidedPlayback,
     dispose() {
       if (disposed) return;
       disposed = true;
       selectionRequest += 1;
       if (selectionController) document.removeEventListener('keydown', handleKeyDown);
+      if (animationFrameId !== null) cancelFrame(animationFrameId);
+      animationFrameId = null;
+      previousFrameTime = null;
+      guidedSequence.pause();
+      cameraTween?.dispose();
+      timeline?.dispose();
       selectionController?.dispose();
       assemblyTree?.dispose();
       inspector?.dispose();

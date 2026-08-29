@@ -23,6 +23,7 @@ export interface InspectorCallbacks {
 
 export interface InspectorController {
   select(partId: string | null): void;
+  updateAssemblyState(state: AssemblyState): void;
   setActionState(state: { hidden: boolean; isolated: boolean; transparent: boolean }): void;
   dispose(): void;
 }
@@ -82,6 +83,7 @@ export function mountInspector(
   root.append(heading, content, footer);
   host.replaceChildren(root);
   let currentPartId: string | null = null;
+  let currentAssemblyState = state;
 
   const renderEmpty = (): void => {
     content.className = 'inspector-content inspector-empty';
@@ -93,7 +95,7 @@ export function mountInspector(
   };
   const render = (partId: string | null): void => {
     currentPartId = partId;
-    const model = partId ? createInspectorViewModel(manifest, state, partId) : null;
+    const model = partId ? createInspectorViewModel(manifest, currentAssemblyState, partId) : null;
     if (!model) {
       renderEmpty();
       return;
@@ -158,6 +160,13 @@ export function mountInspector(
 
   return {
     select: render,
+    updateAssemblyState(nextState) {
+      currentAssemblyState = nextState;
+      if (!currentPartId) return;
+      const progress = Math.round((currentAssemblyState.progress[currentPartId] ?? 0) * 100);
+      const progressLabel = content.querySelector<HTMLElement>('[data-testid="part-progress"]');
+      if (progressLabel) progressLabel.textContent = `${progress}%`;
+    },
     setActionState(actionState) {
       const mappings = [
         ['hide', actionState.hidden],
