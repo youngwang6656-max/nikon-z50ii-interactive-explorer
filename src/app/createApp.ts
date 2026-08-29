@@ -5,7 +5,12 @@ import { mountAssemblyTree, type AssemblyTreeController } from '../ui/assemblyTr
 import { mountAppShell, type AppShell } from '../ui/appShell';
 import { mountInspector, type InspectorController } from '../ui/inspector';
 import { handleSelectionShortcut } from '../ui/keyboardShortcuts';
-import { mountTimeline, type TimelineCallbacks, type TimelineController } from '../ui/timeline';
+import {
+  mountTimeline,
+  type TimelineCallbacks,
+  type TimelineController,
+  type TimelineMode,
+} from '../ui/timeline';
 import { CameraPresetTween } from '../viewer/cameraPresetTween';
 import { createViewer, type Viewer } from '../viewer/createRenderer';
 import { disposeObjectTree } from '../viewer/disposeObjectTree';
@@ -108,6 +113,7 @@ export async function createApp(
   let animationFrameId: number | null = null;
   let previousFrameTime: number | null = null;
   let publishedProgress = 0;
+  let interactionMode: TimelineMode = 'guided';
 
   const setModuleStatus = (
     moduleId: string,
@@ -215,8 +221,11 @@ export async function createApp(
     assemblyState = snapshot.assembly;
     shell.root.dataset.assemblyProgress = formatProgress(publishedProgress);
     shell.root.setAttribute('data-assembly-progress', formatProgress(publishedProgress));
-    shell.root.dataset.guidedPlaybackActive = String(snapshot.isPlaying);
-    shell.root.dataset.freeDragEnabled = String(!snapshot.isPlaying);
+    shell.root.dataset.interactionMode = interactionMode;
+    shell.root.dataset.guidedPlaybackActive = String(
+      interactionMode === 'guided' && snapshot.isPlaying,
+    );
+    shell.root.dataset.freeDragEnabled = String(interactionMode === 'free');
     shell.root.dataset.cameraTweenActive = String(cameraTween?.active ?? false);
     guidedTransforms.apply(assemblyState, viewer.partIndex ?? new Map());
     inspector?.updateAssemblyState(assemblyState);
@@ -319,21 +328,27 @@ export async function createApp(
   if (shell.timelinePanel) {
     timeline = (dependencies.mountTimeline ?? mountTimeline)(shell.timelinePanel, manifest, {
       onModeChange(mode) {
+        interactionMode = mode;
+        timeline?.setMode(mode);
         if (mode === 'free') cancelGuidedPlayback();
+        else seekGuided(publishedProgress);
       },
       onTogglePlay() {
+        if (interactionMode !== 'guided') return;
         if (guidedSequence.snapshot().isPlaying) {
           cancelGuidedPlayback();
           return;
         }
-        if (guidedSequence.snapshot().normalizedTime >= 1) guidedSequence.seek(0);
+        const playhead = publishedProgress >= 1 ? 0 : publishedProgress;
+        guidedSequence.seek(playhead);
         guidedSequence.play();
         startCurrentCameraPreset();
         void loadAllModules();
-        publishSequence(guidedSequence.snapshot().normalizedTime);
+        publishSequence(playhead);
         ensureAnimationFrame();
       },
       onPrevious() {
+        if (interactionMode !== 'guided') return;
         const previousStepIndex = guidedSequence.snapshot().activeStepIndex;
         guidedSequence.previous();
         if (guidedSequence.snapshot().activeStepIndex !== previousStepIndex) startCurrentCameraPreset();
@@ -341,6 +356,7 @@ export async function createApp(
         if (cameraTween?.active) ensureAnimationFrame();
       },
       onNext() {
+        if (interactionMode !== 'guided') return;
         const previousStepIndex = guidedSequence.snapshot().activeStepIndex;
         guidedSequence.next();
         if (guidedSequence.snapshot().activeStepIndex !== previousStepIndex) startCurrentCameraPreset();
@@ -348,15 +364,22 @@ export async function createApp(
         publishSequence(guidedSequence.snapshot().normalizedTime);
         if (cameraTween?.active) ensureAnimationFrame();
       },
-      onSeek: seekGuided,
+      onSeek(normalizedTime) {
+        if (interactionMode === 'guided') seekGuided(normalizedTime);
+      },
       onGlobalExplode(progress) {
         guidedSequence.pause();
         cameraTween?.cancel();
-        assemblyState = setGlobalExplode(assemblyState, progress);
+        previousFrameTime = null;
+        assemblyState = {
+          ...setGlobalExplode(assemblyState, progress),
+          history: [],
+        };
         guidedSequence.replaceAssemblyState(assemblyState);
         publishSequence(progress, progress);
       },
     });
+    timeline.setMode(interactionMode);
     publishSequence(0);
   }
 
@@ -391,8 +414,10 @@ export async function createApp(
     inspector,
     timeline,
     guidedSequence,
-    get guidedPlaybackActive() { return guidedSequence.snapshot().isPlaying; },
-    get freeDragEnabled() { return !guidedSequence.snapshot().isPlaying; },
+    get guidedPlaybackActive() {
+      return interactionMode === 'guided' && guidedSequence.snapshot().isPlaying;
+    },
+    get freeDragEnabled() { return interactionMode === 'free'; },
     preloadReady,
     cancelGuidedPlayback,
     dispose() {

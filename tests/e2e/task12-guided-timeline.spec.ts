@@ -25,6 +25,18 @@ test('guided timeline moves forward and reverse, coordinates loading, and reasse
   await expect(page.getByTestId('guided-play')).toHaveAccessibleName('播放拆解序列');
   await expect(page.getByTestId('guided-step-title')).toContainText('拆卸');
   await expect(page.getByLabel('整体爆炸进度')).toBeVisible();
+  await page.getByTestId('mode-guided').selectOption('free');
+  await expect(root).toHaveAttribute('data-interaction-mode', 'free');
+  await expect(root).toHaveAttribute('data-free-drag-enabled', 'true');
+  await expect(page.getByTestId('guided-play')).toBeDisabled();
+  await expect(page.getByTestId('guided-previous')).toBeDisabled();
+  await expect(page.getByTestId('guided-next')).toBeDisabled();
+  await expect(page.getByTestId('guided-progress')).toBeDisabled();
+  await expect(page.getByTestId('global-explode')).toBeEnabled();
+  await page.getByTestId('mode-guided').selectOption('guided');
+  await expect(root).toHaveAttribute('data-interaction-mode', 'guided');
+  await expect(root).toHaveAttribute('data-free-drag-enabled', 'false');
+  await expect(page.getByTestId('guided-play')).toBeEnabled();
 
   await page.getByTestId('guided-next').click();
   await expect(root).toHaveAttribute('data-assembly-progress', '0.025');
@@ -49,6 +61,16 @@ test('guided timeline moves forward and reverse, coordinates loading, and reasse
   await setRange(page, 'global-explode', 600);
   await expect(root).toHaveAttribute('data-assembly-progress', '0.6');
   await expect(page.getByTestId('part-progress')).toHaveText('60%');
+  const atomicPlay = await page.getByTestId('guided-play').evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    return {
+      rootProgress: document.querySelector<HTMLElement>('.app-shell')?.dataset.assemblyProgress,
+      partProgress: document.querySelector<HTMLElement>('[data-testid="part-progress"]')?.textContent,
+      playing: document.querySelector<HTMLElement>('.app-shell')?.dataset.guidedPlaybackActive,
+    };
+  });
+  expect(atomicPlay).toEqual({ rootProgress: '0.6', partProgress: '100%', playing: 'true' });
+  await page.getByTestId('guided-play').click();
   await setRange(page, 'global-explode', 0);
   await expect(root).toHaveAttribute('data-assembly-progress', '0');
   await expect(page.getByTestId('part-progress')).toHaveText('0%');
@@ -59,7 +81,7 @@ test('guided timeline moves forward and reverse, coordinates loading, and reasse
   await expect(root).toHaveAttribute('data-free-drag-enabled', 'false');
   await page.getByTestId('guided-play').click();
   await expect(root).toHaveAttribute('data-guided-playback-active', 'false');
-  await expect(root).toHaveAttribute('data-free-drag-enabled', 'true');
+  await expect(root).toHaveAttribute('data-free-drag-enabled', 'false');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('.timeline-panel').scrollIntoViewIfNeeded();
@@ -67,8 +89,12 @@ test('guided timeline moves forward and reverse, coordinates loading, and reasse
   const metrics = await page.evaluate(() => ({
     width: document.documentElement.scrollWidth,
     viewport: window.innerWidth,
+    targets: [...document.querySelectorAll<HTMLElement>(
+      '.timeline-button,.timeline-mode,.timeline-slider',
+    )].map((element) => element.getBoundingClientRect().height),
   }));
   expect(metrics.width).toBeLessThanOrEqual(metrics.viewport);
+  expect(Math.min(...metrics.targets)).toBeGreaterThanOrEqual(44);
   await page.screenshot({ path: `${evidenceDir}/task-12-mobile-timeline.png` });
   expect(errors).toEqual([]);
 });

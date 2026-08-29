@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import productionManifestFixture from '../../public/assembly-manifest.json';
-import { createAssemblyState, setGlobalExplode } from '../../src/domain/assemblyState';
+import { createAssemblyState, setGlobalExplode, undoLastMove } from '../../src/domain/assemblyState';
 import { GuidedSequence } from '../../src/domain/guidedSequence';
 import { parseManifest, type AssemblyManifest } from '../../src/domain/manifest';
 
@@ -69,6 +69,20 @@ describe('guided sequence', () => {
     expect(oneChunk.snapshot()).toEqual(manyChunks.snapshot());
     expect(oneChunk.snapshot().normalizedTime).toBe(1);
     expect(oneChunk.snapshot().isPlaying).toBe(false);
+  });
+
+  it('reaches the exact endpoint for thousands of one-millisecond ticks', () => {
+    const oneChunk = new GuidedSequence(manifest, createAssemblyState(manifest), { stepDurationMs: 100 });
+    const tinyChunks = new GuidedSequence(manifest, createAssemblyState(manifest), { stepDurationMs: 100 });
+    oneChunk.play();
+    tinyChunks.play();
+
+    oneChunk.tick(4_000);
+    for (let index = 0; index < 4_000; index += 1) tinyChunks.tick(1);
+
+    expect(tinyChunks.snapshot()).toEqual(oneChunk.snapshot());
+    expect(tinyChunks.snapshot().normalizedTime).toBe(1);
+    expect(tinyChunks.snapshot().isPlaying).toBe(false);
   });
 
   it('pauses without advancing and clamps seek values', () => {
@@ -156,5 +170,28 @@ describe('guided sequence', () => {
         expect(part.dependsOn.every((dependencyId) => progress[dependencyId] === 1)).toBe(true);
       }
     }
+  });
+
+  it('clears incompatible free-mode history on construction, replacement, and guided seek', () => {
+    const partId = manifest.parts[0]!.partId;
+    const prior = {
+      ...createAssemblyState(manifest),
+      progress: { ...createAssemblyState(manifest).progress, [partId]: 0.4 },
+      history: [{ partId, from: 0, to: 0.4 }],
+    };
+    const sequence = new GuidedSequence(manifest, prior);
+    expect(sequence.snapshot().assembly.history).toEqual([]);
+
+    sequence.replaceAssemblyState({
+      ...prior,
+      progress: { ...prior.progress, [partId]: 0.7 },
+      history: [{ partId, from: 0.4, to: 0.7 }],
+    });
+    sequence.seek(0.5);
+    const guided = sequence.snapshot().assembly;
+    const afterUndo = undoLastMove(guided);
+
+    expect(guided.history).toEqual([]);
+    expect(afterUndo.progress).toEqual(guided.progress);
   });
 });

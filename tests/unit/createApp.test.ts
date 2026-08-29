@@ -168,11 +168,12 @@ describe('createApp lifecycle', () => {
       partIndex: new Map([[fixture.parts[0]!.partId, part]]),
     } as unknown as Viewer;
     let callbacks: TimelineCallbacks | undefined;
+    let timelineMode: 'guided' | 'free' = 'guided';
     const timeline: TimelineController = {
       root: {} as HTMLElement,
-      mode: 'guided',
+      get mode() { return timelineMode; },
       render: vi.fn(),
-      setMode: vi.fn(),
+      setMode: vi.fn((mode) => { timelineMode = mode; }),
       dispose: vi.fn(),
     };
     let frameCallback: FrameRequestCallback | undefined;
@@ -194,6 +195,23 @@ describe('createApp lifecycle', () => {
       prefersReducedMotion: () => false,
     });
 
+    expect(app.guidedPlaybackActive).toBe(false);
+    expect(app.freeDragEnabled).toBe(false);
+    callbacks!.onModeChange('free');
+    expect(timelineMode).toBe('free');
+    expect(shell.root.dataset.interactionMode).toBe('free');
+    expect(app.freeDragEnabled).toBe(true);
+    callbacks!.onTogglePlay();
+    expect(app.guidedPlaybackActive).toBe(false);
+    callbacks!.onGlobalExplode(0.6);
+    expect(app.assemblyState.progress[fixture.parts[0]!.partId]).toBe(0.6);
+    callbacks!.onModeChange('guided');
+    expect(timelineMode).toBe('guided');
+    expect(app.freeDragEnabled).toBe(false);
+    expect(app.guidedSequence.snapshot().normalizedTime).toBe(0.6);
+    expect(app.assemblyState.progress[fixture.parts[0]!.partId]).toBe(1);
+    expect(shell.root.dataset.assemblyProgress).toBe('0.6');
+
     callbacks!.onSeek(0.75);
     expect(shell.root.dataset.assemblyProgress).toBe('0.75');
     expect(shell.root.dataset.cameraTweenActive).toBe('true');
@@ -201,8 +219,17 @@ describe('createApp lifecycle', () => {
     callbacks!.onGlobalExplode(0.6);
     expect(shell.root.dataset.assemblyProgress).toBe('0.6');
     expect(shell.root.dataset.cameraTweenActive).toBe('false');
+    expect(app.assemblyState.history).toEqual([]);
     frameCallback!(100);
     expect(shell.root.dataset.assemblyProgress).toBe('0.6');
+    callbacks!.onTogglePlay();
+    expect(app.guidedSequence.snapshot().normalizedTime).toBe(0.6);
+    expect(shell.root.dataset.assemblyProgress).toBe('0.6');
+    expect(app.assemblyState.progress[fixture.parts[0]!.partId]).toBe(1);
+    const atomicProgress = { ...app.assemblyState.progress };
+    frameCallback!(200);
+    expect(app.assemblyState.progress).toEqual(atomicProgress);
+    callbacks!.onTogglePlay();
     callbacks!.onSeek(0);
     expect(part.matrix.elements).toEqual(assembledMatrix.elements);
 
@@ -213,7 +240,7 @@ describe('createApp lifecycle', () => {
     frameCallback!(100);
     app.cancelGuidedPlayback();
     expect(app.guidedPlaybackActive).toBe(false);
-    expect(app.freeDragEnabled).toBe(true);
+    expect(app.freeDragEnabled).toBe(false);
 
     app.dispose();
     expect(cancelFrame).toHaveBeenCalledWith(41);

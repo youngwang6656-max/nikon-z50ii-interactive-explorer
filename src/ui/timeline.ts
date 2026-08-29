@@ -134,7 +134,22 @@ export function mountTimeline(
   root.append(heading, controls);
   host.replaceChildren(root);
 
-  const handleModeChange = (): void => callbacks.onModeChange(modeSelect.value as TimelineMode);
+  let currentMode: TimelineMode = 'guided';
+  let lastSnapshot: GuidedSequenceSnapshot | null = null;
+  root.dataset.mode = currentMode;
+  const applyControlState = (): void => {
+    const free = currentMode === 'free';
+    play.disabled = free;
+    progress.disabled = free;
+    previous.disabled = free || (lastSnapshot?.normalizedTime ?? 0) <= 0;
+    next.disabled = free || (lastSnapshot?.normalizedTime ?? 0) >= 1;
+  };
+  const handleModeChange = (): void => {
+    currentMode = modeSelect.value as TimelineMode;
+    root.dataset.mode = currentMode;
+    applyControlState();
+    callbacks.onModeChange(currentMode);
+  };
   const handlePlay = (): void => callbacks.onTogglePlay();
   const handlePrevious = (): void => callbacks.onPrevious();
   const handleNext = (): void => callbacks.onNext();
@@ -146,13 +161,15 @@ export function mountTimeline(
   next.addEventListener('click', handleNext);
   progress.addEventListener('input', handleSeek);
   explode.addEventListener('input', handleGlobalExplode);
+  applyControlState();
 
   let disposed = false;
   return {
     root,
-    get mode() { return modeSelect.value as TimelineMode; },
+    get mode() { return currentMode; },
     render(snapshot, globalExplodeProgress) {
       if (disposed) return;
+      lastSnapshot = snapshot;
       const model = createTimelineViewModel(snapshot, manifest.steps.length);
       stepTitle.textContent = model.title;
       stepEnglish.textContent = model.subtitle;
@@ -163,13 +180,14 @@ export function mountTimeline(
       progress.value = String(Math.round(snapshot.normalizedTime * 1000));
       progress.setAttribute('aria-valuetext', `${model.count}，${model.title}`);
       explode.value = String(Math.round((globalExplodeProgress ?? snapshot.normalizedTime) * 1000));
-      previous.disabled = snapshot.normalizedTime <= 0;
-      next.disabled = snapshot.normalizedTime >= 1;
+      applyControlState();
     },
     setMode(mode) {
       if (disposed) return;
+      currentMode = mode;
       modeSelect.value = mode;
       root.dataset.mode = mode;
+      applyControlState();
     },
     dispose() {
       if (disposed) return;

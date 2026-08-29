@@ -113,8 +113,10 @@ export class GuidedSequence {
   private readonly orderedParts: readonly PartManifest[];
   private readonly snapshotManifest: AssemblyManifest;
   private readonly stepDurationMs: number;
+  private readonly totalDurationMicroseconds: number;
   private state: AssemblyState;
   private normalizedTime = 0;
+  private elapsedMicroseconds = 0;
   private playing = false;
 
   constructor(
@@ -132,12 +134,17 @@ export class GuidedSequence {
       && (options.stepDurationMs ?? 0) > 0
       ? options.stepDurationMs!
       : DEFAULT_STEP_DURATION_MS;
+    this.totalDurationMicroseconds = Math.round(
+      this.steps.length * this.stepDurationMs * 1_000,
+    );
     this.state = {
       manifest,
       progress: Object.fromEntries(
         manifest.parts.map((part) => [part.partId, clamp01(initialState.progress[part.partId] ?? 0)]),
       ),
-      history: initialState.history.map((move) => ({ ...move })),
+      // Guided time is an absolute assembly state, not an undoable free-mode
+      // move. Never let undo cross the mode boundary.
+      history: [],
     };
   }
 
@@ -174,14 +181,29 @@ export class GuidedSequence {
       return;
     }
     this.normalizedTime = clamp01(requestedTime);
+    this.elapsedMicroseconds = Math.round(
+      this.normalizedTime * this.totalDurationMicroseconds,
+    );
     this.applyTimeToAssembly();
     if (this.normalizedTime >= 1) this.playing = false;
   }
 
   tick(milliseconds: number): void {
     if (!this.playing || !Number.isFinite(milliseconds) || milliseconds <= 0) return;
-    const totalDuration = this.steps.length * this.stepDurationMs;
-    this.seek(this.normalizedTime + milliseconds / totalDuration);
+    const increment = Math.round(milliseconds * 1_000);
+    if (increment <= 0) return;
+    this.elapsedMicroseconds = Math.min(
+      this.totalDurationMicroseconds,
+      this.elapsedMicroseconds + increment,
+    );
+    this.normalizedTime = this.totalDurationMicroseconds === 0
+      ? 0
+      : this.elapsedMicroseconds / this.totalDurationMicroseconds;
+    this.applyTimeToAssembly();
+    if (this.elapsedMicroseconds >= this.totalDurationMicroseconds) {
+      this.normalizedTime = 1;
+      this.playing = false;
+    }
   }
 
   replaceAssemblyState(state: AssemblyState): void {
@@ -190,7 +212,7 @@ export class GuidedSequence {
       progress: Object.fromEntries(
         this.manifest.parts.map((part) => [part.partId, clamp01(state.progress[part.partId] ?? 0)]),
       ),
-      history: state.history.map((move) => ({ ...move })),
+      history: [],
     };
   }
 

@@ -96,3 +96,45 @@ Evidence:
 - Vite retains the pre-existing warning that the main Three.js bundle exceeds 500 kB; code splitting is outside Task 12 scope.
 - The E2E runner reports the existing `NO_COLOR`/`FORCE_COLOR` environment warning from Node. It does not affect browser behavior.
 - Task 13 can consume the exposed free-drag/playback/cancel hooks; free-drag handles themselves are intentionally not introduced in Task 12.
+
+## Fix Round 1 (reviewed commit `72af768`)
+
+### Deterministic playback endpoint
+
+- Reproduced the partition bug with 4,000 one-millisecond ticks: normalized time stopped at `0.9999999999999176` and playback remained active while one 4,000 ms tick ended exactly.
+- Guided playback now keeps integer microseconds as its timing authority and derives normalized time from that state. One large chunk and thousands of 1 ms chunks produce identical snapshots, exact normalized time `1`, and exact auto-pause.
+
+### History boundary semantics
+
+- Guided sequence construction and replacement now clear incoming free-mode history.
+- Guided seek/play continue from a history-free absolute state; the full-explode control also clears the transition records generated while applying its uniform target.
+- `undoLastMove` therefore cannot cross a guided/global mode boundary and replay an unrelated prior transition.
+
+### Authoritative interaction mode and atomic global-to-play
+
+- `guided` and `free` are now application state, not cosmetic select text. The root publishes `data-interaction-mode`.
+- Free mode pauses guided playback, enables `freeDragEnabled`, and disables play, previous, next, and guided seek controls. The independent global-explode slider remains enabled.
+- Guided mode owns those controls and keeps `freeDragEnabled=false` even while paused. Direct stale callbacks are guarded by the same application mode.
+- Play reconciles the current published playhead into a valid guided assembly state before starting. A uniform global state at `0.6` changes atomically to guided time `0.6`: root, geometry, assembly state, inspector, and timeline agree before the first animation frame, whose delta is reset to zero.
+
+### World-space transform correction
+
+- Replaced local-axis translation with assembled-world transform records.
+- New and replacement indexed roots capture exact assembled local and world matrices. Late nested roots reconstruct their assembled world matrix through recorded assembled ancestors, even when those ancestors are currently exploded.
+- Indexed roots are processed by object depth. Each desired world transform is converted through the current parent-world inverse; nested tagged roots therefore receive independent manifest offsets instead of inheriting and double-counting tagged-parent displacement.
+- Ordinary untagged descendants continue to follow their indexed host naturally.
+- Rotated/non-uniformly scaled parents, nested tagged parent/child roots, ordinary descendants, late roots, high/low object replacement, `matrixAutoUpdate=false`, unchanged quaternion/scale, and exact reverse matrix restoration are covered by focused tests.
+
+### Mobile and evidence hygiene
+
+- Mobile timeline select, buttons, and sliders now expose at least 44 px interaction heights without horizontal overflow.
+- Browser coverage exercises free/guided disabled-state transitions, atomic global→Play, forward/reverse, keyboard regression through Task 11, and mobile target measurements.
+- Restored Task 11 desktop and mobile-timeline evidence byte-for-byte from base `2b3f4c6` (Git blob hashes `1f363d411b174bfcd2140fdaf343732bd2615e87` and `725181fafda944d6e701528d1d125f160696ce73`). Task 12 no longer retains rewritten prior-task evidence.
+
+### Fix-round verification
+
+- Focused sequence/transform/lifecycle/timeline suites: **4 / 4 files, 20 / 20 tests passed**.
+- Full `check`: **14 / 14 files, 71 / 71 tests passed**, followed by TypeScript and production Vite build.
+- Focused Task 12 browser test passed after the interaction-mode expectation was aligned with the authoritative contract.
+- Final full browser regression: **2 / 2 passed** (Task 11 plus Task 12), with zero browser/page console errors and clean owned-preview shutdown.
+- After that E2E regenerated prior screenshots, both Task 11 images were restored again and their Git object hashes matched base `2b3f4c6` exactly.
