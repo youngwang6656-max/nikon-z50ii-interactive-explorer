@@ -14,10 +14,14 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4175',
     browserName: 'chromium',
-    ...(executablePath
-      ? { launchOptions: { executablePath } }
-      : { channel: 'chrome' as const }),
+    ...(executablePath ? { launchOptions: { executablePath } } : {}),
     headless: true,
     viewport: { width: 1440, height: 900 },
   },
+  projects: executablePath
+    ? [{ name: 'chromium' }]
+    : [
+        { name: 'chrome', use: { channel: 'chrome' } },
+        { name: 'edge', use: { channel: 'msedge' } },
+      ],
 });

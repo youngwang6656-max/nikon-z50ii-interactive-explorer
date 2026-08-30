@@ -1,4 +1,11 @@
-import { Group, Mesh, MeshStandardMaterial, Texture } from 'three';
+import {
+  BufferGeometry,
+  Group,
+  Mesh,
+  MeshStandardMaterial,
+  Object3D,
+  Texture,
+} from 'three';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PartDisplayController } from '../../src/viewer/partDisplayController';
@@ -12,6 +19,39 @@ function indexedPart(partId: string, material: MeshStandardMaterial) {
 }
 
 describe('PartDisplayController', () => {
+  it('transfers hidden, isolated, and ghosted state to replacement part objects', () => {
+    const firstA = new Group();
+    const firstB = new Group();
+    firstA.add(new Mesh(new BufferGeometry(), new MeshStandardMaterial()));
+    firstB.add(new Mesh(new BufferGeometry(), new MeshStandardMaterial()));
+    const index = new Map<string, Object3D>([['a', firstA], ['b', firstB]]);
+    const controller = new PartDisplayController(index);
+    controller.toggleHidden('a');
+    controller.toggleTransparency('a');
+    controller.toggleIsolation('b');
+    const snapshot = controller.snapshot();
+
+    const nextA = new Group();
+    const nextB = new Group();
+    nextA.add(new Mesh(new BufferGeometry(), new MeshStandardMaterial()));
+    nextB.add(new Mesh(new BufferGeometry(), new MeshStandardMaterial()));
+    index.set('a', nextA);
+    index.set('b', nextB);
+    controller.restore(snapshot);
+
+    expect(controller.getState('a')).toEqual({
+      hidden: true,
+      isolated: false,
+      transparent: true,
+    });
+    expect(controller.getState('b')).toEqual({
+      hidden: false,
+      isolated: true,
+      transparent: false,
+    });
+    expect(nextA.visible).toBe(false);
+    expect(nextB.visible).toBe(true);
+  });
   it('isolates transparency to one mesh sharing a GLTF material and restores exact ownership', () => {
     const shared = new MeshStandardMaterial({ opacity: 0.82, transparent: false });
     const sharedTexture = new Texture();

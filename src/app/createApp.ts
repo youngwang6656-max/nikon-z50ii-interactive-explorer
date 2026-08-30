@@ -1,4 +1,8 @@
-import { parseManifest, type AssemblyManifest } from '../domain/manifest';
+import {
+  parseManifest,
+  type AssemblyManifest,
+  type QualityLevel,
+} from '../domain/manifest';
 import {
   createAssemblyState,
   resetAssembly as resetAssemblyState,
@@ -29,6 +33,11 @@ import { AxisDragController } from '../viewer/axisDragController';
 import { CutawayController } from '../viewer/cutawayController';
 import { LightingController } from '../viewer/lightingController';
 import type { VisibilityController } from '../viewer/visibilityController';
+import {
+  AdaptiveQualityController,
+  QUALITY_PROFILES,
+  type QualityMode,
+} from '../viewer/qualityController';
 
 export interface App {
   readonly manifest: AssemblyManifest;
@@ -45,6 +54,7 @@ export interface App {
   readonly inspector: InspectorController | null;
   readonly timeline: TimelineController | null;
   readonly guidedSequence: GuidedSequence;
+  readonly qualityController: AdaptiveQualityController;
   readonly guidedPlaybackActive: boolean;
   readonly freeDragEnabled: boolean;
   readonly preloadReady: Promise<void>;
@@ -98,6 +108,7 @@ export async function createApp(
   container: HTMLElement,
   dependencies: AppDependencies = {},
 ): Promise<App> {
+  const appStartedAt = performance.now();
   const manifest = await (dependencies.loadManifest ?? loadPublicManifest)();
   const shell = (dependencies.mountShell ?? mountAppShell)(container, manifest);
 
@@ -118,7 +129,11 @@ export async function createApp(
   let disposed = false;
 
   const mountedModuleIds = new Set<string>();
-  const moduleMountPromises = new Map<string, Promise<void>>();
+  const mountedQualities = new Map<string, QualityLevel>();
+  const moduleMountOperations = new Map<string, {
+    readonly quality: QualityLevel;
+    readonly promise: Promise<void>;
+  }>();
   const displayController = viewer.partIndex
     ? new PartDisplayController(viewer.partIndex)
     : null;
@@ -159,62 +174,134 @@ export async function createApp(
   let previousFrameTime: number | null = null;
   let publishedProgress = 0;
   let interactionMode: TimelineMode = 'guided';
+  let switchMountedModules = async (_quality: QualityLevel): Promise<void> => undefined;
+  const qualityController = new AdaptiveQualityController((quality) => {
+    void switchMountedModules(quality);
+  });
+  let removeFrameObserver: (() => void) | null = null;
 
   const setModuleStatus = (
     moduleId: string,
     status: 'idle' | 'loading' | 'ready' | 'failed',
     error?: string,
+    quality: QualityLevel = qualityController.effectiveQuality,
   ): void => {
     shell.setModuleStatus(moduleId, status, error);
-    assemblyTree?.setModuleStatus(moduleId, status, error);
+    const state = moduleLoader.getState(moduleId, quality);
+    assemblyTree?.setModuleStatus(
+      moduleId,
+      status,
+      error,
+      state.retryCount,
+      quality,
+    );
+  };
+
+  const publishSceneMetrics = (): void => {
+    const metrics = viewer.getPerformanceMetrics?.();
+    if (!metrics) return;
+    shell.root.dataset.totalTriangles = String(metrics.triangles);
+    shell.root.dataset.textureBytes = metrics.textureBytes === null
+      ? 'unavailable'
+      : String(metrics.textureBytes);
+    if (metrics.textureBytesUnavailableReason) {
+      shell.root.dataset.textureBytesUnavailableReason =
+        metrics.textureBytesUnavailableReason;
+    } else {
+      delete shell.root.dataset.textureBytesUnavailableReason;
+    }
   };
 
   const attachLoadedModule = (loaded: LoadedModule): void => {
-    if (mountedModuleIds.has(loaded.moduleId)) return;
+    if (mountedQualities.get(loaded.moduleId) === loaded.quality) return;
+    const displaySnapshot = displayController?.snapshot();
+    const selectedPartId = selectionController?.selectedPartId ?? null;
     try {
       viewer.addModule(loaded);
       mountedModuleIds.add(loaded.moduleId);
+      mountedQualities.set(loaded.moduleId, loaded.quality);
       assemblyTree?.setLoadProgress(mountedModuleIds.size, manifest.modules.length);
-      displayController?.apply();
+      if (displaySnapshot) displayController?.restore(displaySnapshot);
+      else displayController?.apply();
       cutawayController?.refresh();
       lightingController?.refresh();
       if (viewer.partIndex) guidedTransforms.apply(assemblyState, viewer.partIndex);
+      selectionController?.select(selectedPartId);
+      updateSelectionUi(selectedPartId);
       axisDragController?.refreshHandle();
+      publishSceneMetrics();
     } catch (error) {
       disposeObjectTree(loaded.root);
       throw error;
     }
   };
 
-  const loadAndMountModule = (moduleId: string): Promise<void> => {
-    const existing = moduleMountPromises.get(moduleId);
-    if (existing) return existing;
-    const operation = (async () => {
-      setModuleStatus(moduleId, 'loading');
+  const loadAndMountModule = (
+    moduleId: string,
+    quality: QualityLevel = qualityController.effectiveQuality,
+  ): Promise<void> => {
+    const existing = moduleMountOperations.get(moduleId);
+    if (existing?.quality === quality) return existing.promise;
+    const before = existing?.promise.catch(() => undefined) ?? Promise.resolve();
+    let operation: Promise<void>;
+    operation = before.then(async () => {
+      if (disposed) return;
+      setModuleStatus(moduleId, 'loading', undefined, quality);
       try {
-        const state = moduleLoader.getState(moduleId, 'high');
+        const state = moduleLoader.getState(moduleId, quality);
         const loaded = await (state.status === 'failed'
           ? moduleLoader.retry(moduleId)
-          : moduleLoader.load(moduleId, 'high'));
+          : moduleLoader.load(moduleId, quality));
         if (disposed) {
           disposeObjectTree(loaded.root);
           return;
         }
         attachLoadedModule(loaded);
-        setModuleStatus(moduleId, 'ready');
+        setModuleStatus(moduleId, 'ready', undefined, quality);
       } catch (error) {
         if (disposed) return;
         setModuleStatus(
           moduleId,
           'failed',
           error instanceof Error ? error.message : String(error),
+          quality,
         );
-        moduleMountPromises.delete(moduleId);
         throw error;
       }
-    })();
-    moduleMountPromises.set(moduleId, operation);
+    }).finally(() => {
+      if (moduleMountOperations.get(moduleId)?.promise === operation) {
+        moduleMountOperations.delete(moduleId);
+      }
+    });
+    moduleMountOperations.set(moduleId, { quality, promise: operation });
     return operation;
+  };
+
+  const publishQuality = (): void => {
+    const effective = qualityController.effectiveQuality;
+    shell.root.dataset.qualityMode = qualityController.mode;
+    shell.root.dataset.qualityEffective = effective;
+    viewer.setQualityProfile?.(QUALITY_PROFILES[effective]);
+    assemblyTree?.setQuality(qualityController.mode, effective);
+  };
+
+  switchMountedModules = async (quality: QualityLevel): Promise<void> => {
+    if (disposed) return;
+    publishQuality();
+    await Promise.allSettled(
+      [...mountedModuleIds].map((moduleId) => loadAndMountModule(moduleId, quality)),
+    );
+    if (disposed || quality !== qualityController.effectiveQuality) return;
+    publishQuality();
+  };
+
+  const setQualityMode = async (mode: QualityMode): Promise<void> => {
+    const previousQuality = qualityController.effectiveQuality;
+    qualityController.setMode(mode);
+    publishQuality();
+    if (qualityController.effectiveQuality === previousQuality) {
+      await switchMountedModules(qualityController.effectiveQuality);
+    }
   };
 
   const publishSelectedTransformBasis = (partId: string | null): void => {
@@ -251,6 +338,7 @@ export async function createApp(
   };
 
   const loadAllModules = async (): Promise<void> => {
+    const loadStartedAt = performance.now();
     const completed = new Set(mountedModuleIds);
     assemblyTree?.setLoadProgress(completed.size, manifest.modules.length);
     await Promise.allSettled(
@@ -261,6 +349,10 @@ export async function createApp(
       }),
     );
     assemblyTree?.setLoadProgress(mountedModuleIds.size, manifest.modules.length);
+    shell.root.dataset.allModulesLoadMs = String(
+      Number((performance.now() - loadStartedAt).toFixed(3)),
+    );
+    publishSceneMetrics();
   };
 
   const formatProgress = (value: number): string => {
@@ -419,6 +511,11 @@ export async function createApp(
     assemblyTree = mountAssemblyTree(shell.assemblyPanel, manifest, {
       onSelectPart: selectTreePart,
       onLoadAll: loadAllModules,
+      onRetryModule: (moduleId) => loadAndMountModule(
+        moduleId,
+        qualityController.effectiveQuality,
+      ),
+      onQualityChange: setQualityMode,
     });
     selectionController = new SelectionController({
       canvas: viewer.renderer.domElement,
@@ -507,6 +604,7 @@ export async function createApp(
       updateSelectionUi(partId);
     });
     assemblyTree.setLoadProgress(0, manifest.modules.length);
+    assemblyTree.setQuality(qualityController.mode, qualityController.effectiveQuality);
   }
 
   if (
@@ -602,6 +700,11 @@ export async function createApp(
     publishSequence(0);
   }
 
+  publishQuality();
+  removeFrameObserver = viewer.onFrame?.((frameTimeMs, cameraMoving, now) => {
+    qualityController.observeFrame(frameTimeMs, cameraMoving, now);
+  }) ?? null;
+
   const handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === 'Escape' && axisDragController?.isDragging) {
       event.preventDefault();
@@ -626,7 +729,12 @@ export async function createApp(
         await loadAndMountModule(module.moduleId);
       } catch { /* status is published by the shared mount operation */ }
     });
-  const preloadReady = Promise.allSettled(preloadPromises).then(() => undefined);
+  const preloadReady = Promise.allSettled(preloadPromises).then(() => {
+    shell.root.dataset.initialLoadMs = String(
+      Number((performance.now() - appStartedAt).toFixed(3)),
+    );
+    publishSceneMetrics();
+  });
 
   return {
     manifest,
@@ -643,6 +751,7 @@ export async function createApp(
     inspector,
     timeline,
     guidedSequence,
+    qualityController,
     get guidedPlaybackActive() {
       return interactionMode === 'guided' && guidedSequence.snapshot().isPlaying;
     },
@@ -661,6 +770,8 @@ export async function createApp(
       animationGeneration += 1;
       previousFrameTime = null;
       guidedSequence.pause();
+      removeFrameObserver?.();
+      removeFrameObserver = null;
       cameraTween?.dispose();
       timeline?.dispose();
       axisDragController?.dispose();

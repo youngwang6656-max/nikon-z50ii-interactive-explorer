@@ -1,6 +1,10 @@
 import './styles/app.css';
 
 import { createApp, type App } from './app/createApp';
+import {
+  createWebGLCompatibilityMessage,
+  WebGLCompatibilityError,
+} from './viewer/createRenderer';
 
 const mount = document.querySelector<HTMLElement>('#app');
 if (!mount) throw new Error('Missing #app mount element');
@@ -12,6 +16,10 @@ void createApp(mount)
     app = createdApp;
   })
   .catch((error: unknown) => {
+    if (error instanceof WebGLCompatibilityError) {
+      mount.replaceChildren(createWebGLCompatibilityMessage());
+      return;
+    }
     const message = error instanceof Error ? error.message : String(error);
     const failure = document.createElement('main');
     failure.className = 'boot-failure';

@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-08-30T12:42:00+08:00",
+  "methodology": {
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "browserMode": "Installed browser channel, Playwright headless with hardware-accelerated WebGL2",
+    "profile": "high",
+    "initialLoadDefinition": "Navigation start until both preload modules report ready",
+    "allModulesLoadDefinition": "Load-all activation until all eight modules report ready",
+    "orbitDefinition": "Median requestAnimationFrame FPS during a two-second pointer orbit",
+    "fullExplosionDefinition": "Minimum requestAnimationFrame FPS while advancing the full-explosion slider across 90 frames",
+    "textureBytesDefinition": "Sum of unique decoded texture width x height x 4 bytes in loaded module materials"
+  },
+  "results": [
+    {
+      "browser": "Chrome",
+      "browserVersion": "152.0.7977.64",
+      "gpuRenderer": "ANGLE (Intel, Intel(R) Arc(TM) Graphics (0x00007D55) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "gpuRendererUnavailableReason": null,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "profile": "high",
+      "triangles": 223099,
+      "textureBytes": 314572800,
+      "textureBytesUnavailableReason": null,
+      "initialLoadMs": 931.62,
+      "allModulesLoadMs": 758.538,
+      "medianOrbitFps": 59.524,
+      "minimumFullExplosionFps": 39.841
+    },
+    {
+      "browser": "Edge",
+      "browserVersion": "151.0.4129.107",
+      "gpuRenderer": "ANGLE (Intel, Intel(R) Arc(TM) Graphics (0x00007D55) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "gpuRendererUnavailableReason": null,
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "profile": "high",
+      "triangles": 223099,
+      "textureBytes": 314572800,
+      "textureBytesUnavailableReason": null,
+      "initialLoadMs": 821.594,
+      "allModulesLoadMs": 1328.235,
+      "medianOrbitFps": 59.88,
+      "minimumFullExplosionFps": 40
+    }
+  ]
+}

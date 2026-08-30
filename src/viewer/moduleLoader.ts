@@ -1,6 +1,14 @@
-import { Object3D } from 'three';
+import {
+  LoadingManager,
+  Material,
+  Mesh,
+  MeshStandardMaterial,
+  Object3D,
+  Texture,
+} from 'three';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { GLTFParser } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 import type {
   AssemblyManifest,
@@ -20,6 +28,8 @@ export interface ModuleLoadState {
 
 export interface ModuleAsset {
   scene: Object3D;
+  failedTextureUrls?: readonly string[];
+  failedMaterials?: readonly Material[];
 }
 
 export interface ModuleFetcher {
@@ -61,6 +71,114 @@ function indexParts(moduleId: string, root: Object3D): Map<string, Object3D> {
   return partIndex;
 }
 
+function textureUnavailable(texture: Texture): boolean {
+  const image = texture.image as {
+    complete?: boolean;
+    naturalWidth?: number;
+    width?: number;
+  } | null | undefined;
+  if (!image) return true;
+  if (image.complete === true && image.naturalWidth === 0) return true;
+  return image.width === 0;
+}
+
+function materialTextures(material: Material): Texture[] {
+  return Object.values(material)
+    .filter((value): value is Texture => value instanceof Texture);
+}
+
+export function neutralizeFailedMaterialTextures(
+  root: Object3D,
+  failedTextureUrls: readonly string[],
+  failedMaterials: readonly Material[] = [],
+): void {
+  if (failedTextureUrls.length === 0) return;
+  const explicitlyFailed = new Set(failedMaterials);
+  const replacements = new Map<Material, Material>();
+  const failedTextures = new Set<Texture>();
+  root.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    const assignments = Array.isArray(object.material) ? object.material : [object.material];
+    let changed = false;
+    const nextAssignments = assignments.map((material) => {
+      const unavailableTextures = materialTextures(material).filter(textureUnavailable);
+      if (unavailableTextures.length === 0 && !explicitlyFailed.has(material)) return material;
+      const cached = replacements.get(material);
+      if (cached) {
+        changed = true;
+        return cached;
+      }
+      const replacement = material.clone();
+      for (const [key, value] of Object.entries(replacement)) {
+        if (value instanceof Texture && unavailableTextures.includes(value)) {
+          (replacement as unknown as Record<string, unknown>)[key] = null;
+          failedTextures.add(value);
+        }
+      }
+      if (replacement instanceof MeshStandardMaterial) {
+        replacement.color.setHex(0x777777);
+        replacement.emissive.setHex(0x000000);
+      }
+      replacement.userData.failedTextureUrls = [...failedTextureUrls];
+      replacement.needsUpdate = true;
+      replacements.set(material, replacement);
+      changed = true;
+      return replacement;
+    });
+    if (changed) object.material = Array.isArray(object.material)
+      ? nextAssignments
+      : nextAssignments[0]!;
+  });
+  replacements.forEach((_replacement, original) => original.dispose());
+  failedTextures.forEach((texture) => texture.dispose());
+}
+
+function textureIndices(value: unknown, key = ''): number[] {
+  if (!value || typeof value !== 'object') return [];
+  const record = value as Record<string, unknown>;
+  if (key.endsWith('Texture') && typeof record.index === 'number') {
+    return [record.index];
+  }
+  return Object.entries(record).flatMap(([childKey, child]) =>
+    textureIndices(child, childKey));
+}
+
+function findFailedMaterials(
+  root: Object3D,
+  parser: GLTFParser,
+  assetUrl: string,
+  failedUrls: readonly string[],
+): Material[] {
+  const normalizedFailures = new Set(failedUrls.map((url) => new URL(url, assetUrl).toString()));
+  const json = parser.json as {
+    materials?: unknown[];
+    textures?: Array<{ source?: number }>;
+    images?: Array<{ uri?: string }>;
+  };
+  const failedMaterialIndices = new Set<number>();
+  json.materials?.forEach((definition, materialIndex) => {
+    const failed = textureIndices(definition).some((textureIndex) => {
+      const sourceIndex = json.textures?.[textureIndex]?.source;
+      const uri = sourceIndex === undefined ? undefined : json.images?.[sourceIndex]?.uri;
+      return typeof uri === 'string'
+        && normalizedFailures.has(new URL(uri, assetUrl).toString());
+    });
+    if (failed) failedMaterialIndices.add(materialIndex);
+  });
+  const materials = new Set<Material>();
+  root.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    const assignments = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of assignments) {
+      const materialIndex = parser.associations.get(material)?.materials;
+      if (materialIndex !== undefined && failedMaterialIndices.has(materialIndex)) {
+        materials.add(material);
+      }
+    }
+  });
+  return [...materials];
+}
+
 function createDefaultFetcher(): ModuleFetcher {
   const dracoLoader = new DRACOLoader();
   const baseUrl = new URL(import.meta.env.BASE_URL, document.baseURI);
@@ -69,14 +187,26 @@ function createDefaultFetcher(): ModuleFetcher {
     : new URL('assets/draco/', baseUrl).toString();
   dracoLoader.setDecoderPath(decoderPath);
 
-  const gltfLoader = new GLTFLoader();
-  gltfLoader.setDRACOLoader(dracoLoader);
-
   const fetcher: ModuleFetcher = async (url) => {
+    const failedTextureUrls: string[] = [];
+    const manager = new LoadingManager();
+    manager.onError = (failedUrl) => { failedTextureUrls.push(failedUrl); };
+    const gltfLoader = new GLTFLoader(manager);
+    gltfLoader.setDRACOLoader(dracoLoader);
     // Keeping the model URL absolute lets GLTFLoader resolve standards-compliant
     // external image URIs relative to the GLB itself in both Vite and offline builds.
     const resolvedUrl = new URL(url, baseUrl).toString();
-    return gltfLoader.loadAsync(resolvedUrl);
+    const asset = await gltfLoader.loadAsync(resolvedUrl);
+    return {
+      ...asset,
+      failedTextureUrls,
+      failedMaterials: findFailedMaterials(
+        asset.scene,
+        asset.parser,
+        resolvedUrl,
+        failedTextureUrls,
+      ),
+    };
   };
   fetcher.dispose = () => dracoLoader.dispose();
   return fetcher;
@@ -90,6 +220,7 @@ export class ModuleLoader {
   private readonly states = new Map<string, ModuleLoadState>();
   private readonly lastQuality = new Map<string, QualityLevel>();
   private readonly lastFailedQuality = new Map<string, QualityLevel>();
+  private readonly failedTextureUrls = new Map<string, readonly string[]>();
   private disposed = false;
 
   constructor(manifest: AssemblyManifest, fetcher: ModuleFetcher = createDefaultFetcher()) {
@@ -124,7 +255,7 @@ export class ModuleLoader {
     });
 
     const promise = this.fetcher(module.urls[quality])
-      .then(({ scene }) => {
+      .then(({ scene, failedTextureUrls = [], failedMaterials = [] }) => {
         if (this.disposed) {
           disposeObjectTree(scene);
           throw new Error(
@@ -133,6 +264,7 @@ export class ModuleLoader {
         }
         let partIndex: Map<string, Object3D>;
         try {
+          neutralizeFailedMaterialTextures(scene, failedTextureUrls, failedMaterials);
           partIndex = indexParts(moduleId, scene);
           const expectedPartIds = this.expectedPartIds.get(moduleId) ?? [];
           const expectedSet = new Set(expectedPartIds);
@@ -163,6 +295,7 @@ export class ModuleLoader {
           error: null,
           retryCount: this.states.get(key)?.retryCount ?? 0,
         });
+        this.failedTextureUrls.set(key, [...failedTextureUrls]);
         if (this.lastFailedQuality.get(moduleId) === quality) {
           this.lastFailedQuality.delete(moduleId);
         }
@@ -193,6 +326,10 @@ export class ModuleLoader {
       this.lastFailedQuality.get(moduleId) ?? this.lastQuality.get(moduleId) ?? 'high';
     const key = moduleKey(moduleId, quality);
     const state = this.getState(moduleId, quality);
+    if (state.status === 'loading') {
+      const pending = this.promiseCache.get(key);
+      if (pending) return pending;
+    }
     if (state.status !== 'failed') {
       throw new Error(
         `Cannot retry ${moduleId}:${quality} because its state is ${state.status}`,
@@ -221,6 +358,12 @@ export class ModuleLoader {
     );
   }
 
+  getFailedTextureUrls(moduleId: string, quality: QualityLevel): readonly string[] {
+    this.requireModule(moduleId);
+    this.requireQuality(quality);
+    return this.failedTextureUrls.get(moduleKey(moduleId, quality)) ?? [];
+  }
+
   resolvePartId(object: Object3D | null): string | null {
     let current = object;
     while (current) {
@@ -235,6 +378,7 @@ export class ModuleLoader {
     if (this.disposed) return;
     this.disposed = true;
     this.promiseCache.clear();
+    this.failedTextureUrls.clear();
     this.fetcher.dispose?.();
   }
 

@@ -1,16 +1,27 @@
 import type { AssemblyManifest, PartManifest } from '../domain/manifest';
+import type { QualityLevel } from '../domain/manifest';
 import type { ShellModuleStatus } from './appShell';
+import type { QualityMode } from '../viewer/qualityController';
 
 export interface AssemblyTreeCallbacks {
   onSelectPart(partId: string): void | Promise<void>;
   onLoadAll(): void | Promise<void>;
+  onRetryModule(moduleId: string): void | Promise<void>;
+  onQualityChange(mode: QualityMode): void | Promise<void>;
 }
 
 export interface AssemblyTreeController {
   readonly searchInput: HTMLInputElement;
   select(partId: string | null): void;
-  setModuleStatus(moduleId: string, status: ShellModuleStatus, error?: string): void;
+  setModuleStatus(
+    moduleId: string,
+    status: ShellModuleStatus,
+    error?: string,
+    retryCount?: number,
+    quality?: QualityLevel,
+  ): void;
   setLoadProgress(loaded: number, total: number): void;
+  setQuality(mode: QualityMode, effective: QualityLevel): void;
   focusSearch(): void;
   dispose(): void;
 }
@@ -78,7 +89,24 @@ export function mountAssemblyTree(
   loadAll.setAttribute('aria-label', '加载全部八个结构模块');
   const progress = element('span', 'load-progress', `0 / ${manifest.modules.length}`);
   progress.setAttribute('role', 'status');
-  tools.append(search, loadAll, progress);
+  const qualityLabel = element('label', 'quality-control');
+  qualityLabel.append(element('span', 'quality-label', '质量'));
+  const quality = element('select', 'quality-select');
+  quality.dataset.testid = 'quality-profile';
+  quality.setAttribute('aria-label', '显示质量');
+  for (const [value, label] of [
+    ['auto', '自动'],
+    ['high', '高'],
+    ['low', '低'],
+  ] as const) {
+    const option = element('option', '', label);
+    option.value = value;
+    quality.append(option);
+  }
+  const qualityEffective = element('span', 'quality-effective', '当前：高');
+  qualityEffective.dataset.testid = 'quality-effective';
+  qualityLabel.append(quality, qualityEffective);
+  tools.append(search, qualityLabel, loadAll, progress);
 
   const list = element('div', 'module-list');
   let selectedPartId: string | null = null;
@@ -101,6 +129,17 @@ export function mountAssemblyTree(
     summary.append(indicator, names, moduleStatus);
     summary.setAttribute('aria-label', `${module.nameZh}，${module.nameEn}，未加载`);
     details.setAttribute('aria-label', `${module.nameZh}，${module.nameEn}，未加载`);
+    const recovery = element('div', 'module-recovery');
+    recovery.hidden = true;
+    const recoveryError = element('span', 'module-error');
+    recoveryError.dataset.testid = `module-error-${module.moduleId}`;
+    const retry = element('button', 'module-retry', '重试');
+    retry.type = 'button';
+    retry.dataset.action = 'retry-module';
+    retry.dataset.moduleId = module.moduleId;
+    retry.dataset.testid = `retry-${module.moduleId}`;
+    retry.setAttribute('aria-label', `重试加载${module.nameZh}`);
+    recovery.append(recoveryError, retry);
     const parts = element('div', 'part-list');
     for (const part of manifest.parts.filter((candidate) => candidate.moduleId === module.moduleId)) {
       const button = element('button', 'part-row');
@@ -117,7 +156,7 @@ export function mountAssemblyTree(
       parts.append(button);
       partButtons.set(part.partId, button);
     }
-    details.append(summary, parts);
+    details.append(summary, recovery, parts);
     list.append(details);
     moduleRows.set(module.moduleId, details);
   }
@@ -148,12 +187,24 @@ export function mountAssemblyTree(
       void Promise.resolve(callbacks.onLoadAll()).catch(() => undefined);
       return;
     }
+    const moduleId = target.dataset.moduleId;
+    if (target.dataset.action === 'retry-module' && moduleId) {
+      event.preventDefault();
+      event.stopPropagation();
+      void Promise.resolve(callbacks.onRetryModule(moduleId)).catch(() => undefined);
+      return;
+    }
     const partId = target.dataset.partId;
     if (target.dataset.action === 'select-part' && partId) {
       void Promise.resolve(callbacks.onSelectPart(partId)).catch(() => undefined);
     }
   };
   search.addEventListener('input', handleSearch);
+  const handleQualityChange = (): void => {
+    void Promise.resolve(callbacks.onQualityChange(quality.value as QualityMode))
+      .catch(() => undefined);
+  };
+  quality.addEventListener('change', handleQualityChange);
   root.addEventListener('click', handleClick);
 
   return {
@@ -176,10 +227,12 @@ export function mountAssemblyTree(
       }
       partButtons.get(partId)?.scrollIntoView({ block: 'nearest' });
     },
-    setModuleStatus(moduleId, status, error) {
+    setModuleStatus(moduleId, status, error, retryCount = 0, moduleQuality) {
       const row = moduleRows.get(moduleId);
       if (!row) return;
       row.dataset.status = status;
+      row.dataset.retryCount = String(retryCount);
+      if (moduleQuality) row.dataset.quality = moduleQuality;
       row.title = error ?? '';
       const label = status === 'ready'
         ? '已加载'
@@ -189,7 +242,16 @@ export function mountAssemblyTree(
             ? '加载失败'
             : '未加载';
       const statusNode = row.querySelector<HTMLElement>('.module-status');
-      if (statusNode) statusNode.textContent = label;
+      if (statusNode) statusNode.textContent = retryCount > 0
+        ? `${label} · 重试 ${retryCount}`
+        : label;
+      const recovery = row.querySelector<HTMLElement>('.module-recovery');
+      if (recovery) recovery.hidden = status !== 'failed';
+      if (status === 'failed') row.open = true;
+      const recoveryError = row.querySelector<HTMLElement>('.module-error');
+      if (recoveryError) recoveryError.textContent = error ?? '';
+      const retry = row.querySelector<HTMLButtonElement>('.module-retry');
+      if (retry) retry.disabled = status === 'loading';
       const module = manifest.modules.find((candidate) => candidate.moduleId === moduleId);
       const accessibleLabel = `${module?.nameZh ?? moduleId}，${module?.nameEn ?? ''}，${label}${error ? `：${error}` : ''}`;
       row.setAttribute('aria-label', accessibleLabel);
@@ -200,12 +262,18 @@ export function mountAssemblyTree(
       progress.setAttribute('aria-label', `模块加载进度：${loaded} / ${total}`);
       loadAll.disabled = loaded >= total;
     },
+    setQuality(mode, effective) {
+      quality.value = mode;
+      qualityEffective.textContent = `当前：${effective === 'high' ? '高' : '低'}`;
+      qualityEffective.dataset.quality = effective;
+    },
     focusSearch() {
       search.focus();
       search.select();
     },
     dispose() {
       search.removeEventListener('input', handleSearch);
+      quality.removeEventListener('change', handleQualityChange);
       root.removeEventListener('click', handleClick);
       root.remove();
     },

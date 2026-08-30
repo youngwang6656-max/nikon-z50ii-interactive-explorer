@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import fixture from '../fixtures/assembly-manifest.valid.json';
 import { parseManifest, type QualityLevel } from '../../src/domain/manifest';
 import { ModuleLoader, type ModuleFetcher } from '../../src/viewer/moduleLoader';
+import { neutralizeFailedMaterialTextures } from '../../src/viewer/moduleLoader';
 
 const manifest = parseManifest(fixture);
 
@@ -155,6 +156,62 @@ describe('ModuleLoader', () => {
       error: 'decoder unavailable',
       retryCount: 1,
     });
+  });
+
+  it('deduplicates concurrent retries and increments the retry count once', async () => {
+    let resolveRetry: ((value: { scene: Object3D }) => void) | undefined;
+    const fetcher = vi
+      .fn<ModuleFetcher>()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRetry = resolve; }));
+    const loader = new ModuleLoader(manifest, fetcher);
+    await expect(loader.load('01_chassis_front', 'high')).rejects.toThrow('offline');
+
+    const first = loader.retry('01_chassis_front');
+    const concurrent = loader.retry('01_chassis_front');
+
+    expect(concurrent).toBe(first);
+    expect(loader.getState('01_chassis_front', 'high').retryCount).toBe(1);
+    resolveRetry?.({ scene: sceneWithParts('Z50II-01-001') });
+    await expect(first).resolves.toMatchObject({ quality: 'high' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('neutralizes only materials whose texture failed and records the failed URL', async () => {
+    const scene = sceneWithParts('Z50II-01-001');
+    const healthyTexture = new Texture({ naturalWidth: 32 } as HTMLImageElement);
+    // GLTFLoader omits a texture slot after an external image request fails.
+    const failedMaterial = new MeshStandardMaterial({ color: 0xff00ff });
+    const healthyMaterial = new MeshStandardMaterial({ color: 0x123456, map: healthyTexture });
+    const affected = new Mesh(new BufferGeometry(), failedMaterial);
+    const unaffected = new Mesh(new BufferGeometry(), healthyMaterial);
+    scene.children[0]!.add(affected, unaffected);
+    const failedUrl = 'https://example.test/textures/missing-basecolor.png';
+
+    const loader = new ModuleLoader(manifest, async () => ({
+      scene,
+      failedTextureUrls: [failedUrl],
+      failedMaterials: [failedMaterial],
+    }));
+    await loader.load('01_chassis_front', 'high');
+
+    expect(affected.material).not.toBe(failedMaterial);
+    expect((affected.material as MeshStandardMaterial).color.getHex()).toBe(0x777777);
+    expect((affected.material as MeshStandardMaterial).map).toBeNull();
+    expect(affected.material.userData.failedTextureUrls).toEqual([failedUrl]);
+    expect(unaffected.material).toBe(healthyMaterial);
+    expect(loader.getFailedTextureUrls('01_chassis_front', 'high')).toEqual([failedUrl]);
+  });
+
+  it('does not neutralize a material when there are no failed texture URLs', () => {
+    const scene = new Group();
+    const material = new MeshStandardMaterial({ color: 0xff00ff, map: new Texture() });
+    const mesh = new Mesh(new BufferGeometry(), material);
+    scene.add(mesh);
+
+    neutralizeFailedMaterialTextures(scene, []);
+
+    expect(mesh.material).toBe(material);
   });
 
   it('does not create a duplicate loaded root when retry is called after success', async () => {

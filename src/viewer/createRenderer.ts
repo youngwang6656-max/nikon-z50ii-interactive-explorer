@@ -5,6 +5,7 @@ import {
   DirectionalLight,
   Group,
   Mesh,
+  Material,
   Object3D,
   PCFSoftShadowMap,
   PerspectiveCamera,
@@ -15,6 +16,7 @@ import {
   Scene,
   ShadowMaterial,
   SRGBColorSpace,
+  Texture,
   Vector2,
   WebGLRenderer,
   WebGLRenderTarget,
@@ -30,6 +32,102 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import type { LoadedModule } from './moduleLoader';
 import { disposeObjectTree } from './disposeObjectTree';
 import { ModuleMountRegistry } from './moduleMountRegistry';
+import {
+  QUALITY_PROFILES,
+  type QualityProfile,
+} from './qualityController';
+
+export const WEBGL_COMPATIBILITY_MESSAGE =
+  '当前设备无法创建 WebGL2 三维视图。请使用支持硬件加速的桌面版 Chrome 或桌面版 Edge。';
+
+export class WebGLCompatibilityError extends Error {
+  constructor() {
+    super(WEBGL_COMPATIBILITY_MESSAGE);
+    this.name = 'WebGLCompatibilityError';
+  }
+}
+
+export function createWebGLCompatibilityMessage(): HTMLElement {
+  const message = document.createElement('section');
+  message.className = 'webgl-compatibility';
+  message.dataset.testid = 'webgl-compatibility';
+  message.setAttribute('role', 'alert');
+  const title = document.createElement('h2');
+  title.textContent = '无法启动三维视图';
+  const detail = document.createElement('p');
+  detail.textContent = WEBGL_COMPATIBILITY_MESSAGE;
+  message.append(title, detail);
+  return message;
+}
+
+export async function loadEnvironmentWithFallback(
+  load: () => Promise<import('three').Texture>,
+  apply: (texture: import('three').Texture) => void,
+  fallback: (reason: string) => void,
+): Promise<void> {
+  try {
+    const sourceTexture = await load();
+    try {
+      apply(sourceTexture);
+    } finally {
+      sourceTexture.dispose();
+    }
+  } catch (error) {
+    fallback(error instanceof Error ? error.message : String(error));
+  }
+}
+
+export interface SceneMetrics {
+  readonly triangles: number;
+  readonly textureBytes: number | null;
+  readonly textureBytesUnavailableReason: string | null;
+}
+
+export function collectSceneMetrics(scene: Object3D): SceneMetrics {
+  let triangles = 0;
+  const textures = new Set<Texture>();
+  scene.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+    const indexCount = object.geometry.index?.count;
+    const positionCount = object.geometry.getAttribute('position')?.count ?? 0;
+    triangles += Math.floor((indexCount ?? positionCount) / 3);
+    const assignments: Material[] = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+    for (const material of assignments) {
+      for (const value of Object.values(material)) {
+        if (value instanceof Texture) textures.add(value);
+      }
+    }
+  });
+
+  let textureBytes = 0;
+  const unavailable: string[] = [];
+  for (const texture of textures) {
+    const image = texture.image as {
+      width?: number;
+      height?: number;
+      data?: { byteLength?: number };
+    } | null | undefined;
+    const byteLength = image?.data?.byteLength;
+    if (typeof byteLength === 'number') {
+      textureBytes += byteLength;
+      continue;
+    }
+    if (typeof image?.width === 'number' && typeof image.height === 'number') {
+      textureBytes += image.width * image.height * 4;
+      continue;
+    }
+    unavailable.push(texture.name || texture.uuid);
+  }
+  return {
+    triangles,
+    textureBytes: unavailable.length === 0 ? textureBytes : null,
+    textureBytesUnavailableReason: unavailable.length === 0
+      ? null
+      : `Decoded dimensions unavailable for ${unavailable.length} texture(s)`,
+  };
+}
 
 export function calibrateInspectionMaterials(root: Object3D): void {
   const calibrated = new Set<MeshStandardMaterial>();
@@ -65,23 +163,43 @@ export interface Viewer {
   readonly assemblyRoot: Group;
   readonly partIndex: Map<string, Object3D>;
   readonly environmentReady: Promise<void>;
+  readonly quality: import('../domain/manifest').QualityLevel;
   addModule(module: LoadedModule): void;
   removeModule(moduleId: string): void;
   resize(): void;
   render(): void;
+  setQualityProfile(profile: QualityProfile): void;
+  onFrame(listener: (frameTimeMs: number, cameraMoving: boolean, now: number) => void): () => void;
+  getPerformanceMetrics(): SceneMetrics;
   dispose(): void;
 }
 
 export function createViewer(container: HTMLElement): Viewer {
-  const renderer = new WebGLRenderer({ antialias: true, alpha: false });
+  const canvas = document.createElement('canvas');
+  canvas.className = 'viewer-canvas';
+  container.append(canvas);
+  const context = canvas.getContext('webgl2', {
+    alpha: false,
+    antialias: true,
+    depth: true,
+    powerPreference: 'high-performance',
+  });
+  if (!context) {
+    canvas.replaceWith(createWebGLCompatibilityMessage());
+    throw new WebGLCompatibilityError();
+  }
+  const renderer = new WebGLRenderer({
+    canvas,
+    context,
+    antialias: true,
+    alpha: false,
+  });
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.65;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFSoftShadowMap;
-  renderer.domElement.className = 'viewer-canvas';
   renderer.domElement.setAttribute('aria-label', 'Nikon Z50II 三维结构视图');
-  container.append(renderer.domElement);
 
   const scene = new Scene();
   scene.background = new Color(0x070a0f);
@@ -145,34 +263,50 @@ export function createViewer(container: HTMLElement): Viewer {
   const moduleRegistry = new ModuleMountRegistry(assemblyRoot);
   const partIndex = moduleRegistry.partIndex;
   let disposed = false;
+  let quality = QUALITY_PROFILES.high.quality;
+  let pixelRatioCap = QUALITY_PROFILES.high.pixelRatioCap;
+  let cameraMovedSinceRender = false;
+  let previousRenderAt: number | null = null;
+  const frameListeners = new Set<(
+    frameTimeMs: number,
+    cameraMoving: boolean,
+    now: number,
+  ) => void>();
+  const markMoving = (): void => {
+    cameraMovedSinceRender = true;
+  };
+  controls.addEventListener('change', markMoving);
 
   const publicBaseUrl = new URL(import.meta.env.BASE_URL, document.baseURI);
   const environmentUrl = new URL(
     'assets/environment/studio-neutral-1k.hdr',
     publicBaseUrl,
   ).toString();
-  const environmentReady = new RGBELoader()
-    .loadAsync(environmentUrl)
-    .then((sourceTexture) => {
+  const environmentReady = loadEnvironmentWithFallback(
+    () => new RGBELoader().loadAsync(environmentUrl),
+    (sourceTexture) => {
       if (disposed) {
-        sourceTexture.dispose();
         return;
       }
       const nextTarget = pmremGenerator.fromEquirectangular(sourceTexture);
-      sourceTexture.dispose();
       environmentTarget?.dispose();
       environmentTarget = nextTarget;
       scene.environment = nextTarget.texture;
-    })
-    .catch(() => {
+      renderer.domElement.dataset.environment = 'hdr';
+    },
+    (reason) => {
       // The generated neutral room remains active when the optional HDR is unavailable.
-    });
+      renderer.domElement.dataset.environment = 'room';
+      renderer.domElement.dataset.environmentError = reason;
+      renderer.domElement.dataset.environmentFailedUrl = environmentUrl;
+    },
+  );
 
   const resize = (): void => {
     if (disposed) return;
     const width = Math.max(1, container.clientWidth);
     const height = Math.max(1, container.clientHeight);
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, pixelRatioCap);
     renderer.setPixelRatio(pixelRatio);
     renderer.setSize(width, height, false);
     composer.setPixelRatio(pixelRatio);
@@ -190,10 +324,37 @@ export function createViewer(container: HTMLElement): Viewer {
 
   const render = (): void => {
     if (disposed) return;
+    const now = performance.now();
+    const frameTime = previousRenderAt === null ? 0 : now - previousRenderAt;
+    previousRenderAt = now;
     controls.update();
     composer.render();
+    const moving = cameraMovedSinceRender;
+    cameraMovedSinceRender = false;
+    if (frameTime > 0) {
+      frameListeners.forEach((listener) => listener(frameTime, moving, now));
+    }
   };
   renderer.setAnimationLoop(render);
+
+  const setQualityProfile = (profile: QualityProfile): void => {
+    quality = profile.quality;
+    pixelRatioCap = profile.pixelRatioCap;
+    renderer.domElement.dataset.quality = profile.quality;
+    gtaoPass.enabled = profile.aoEnabled;
+    gtaoPass.blendIntensity = profile.aoIntensity;
+    gtaoPass.updateGtaoMaterial({ samples: profile.aoSamples });
+    gtaoPass.updatePdMaterial({ samples: Math.max(4, profile.aoSamples / 2) });
+    scene.environmentIntensity = 0.22 * profile.environmentIntensity;
+    scene.traverse((object) => {
+      if (!(object instanceof DirectionalLight) || !object.castShadow) return;
+      object.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize);
+      object.shadow.map?.dispose();
+      object.shadow.map = null;
+    });
+    resize();
+  };
+  setQualityProfile(QUALITY_PROFILES.high);
 
   const removeModule = (moduleId: string): void => moduleRegistry.remove(moduleId);
 
@@ -210,6 +371,8 @@ export function createViewer(container: HTMLElement): Viewer {
     resizeObserver?.disconnect();
     if (!resizeObserver) window.removeEventListener('resize', resize);
     controls.dispose();
+    controls.removeEventListener('change', markMoving);
+    frameListeners.clear();
     moduleRegistry.dispose();
     outlinePass.dispose();
     gtaoPass.dispose();
@@ -232,10 +395,17 @@ export function createViewer(container: HTMLElement): Viewer {
     assemblyRoot,
     partIndex,
     environmentReady,
+    get quality() { return quality; },
     addModule,
     removeModule,
     resize,
     render,
+    setQualityProfile,
+    onFrame(listener) {
+      frameListeners.add(listener);
+      return () => { frameListeners.delete(listener); };
+    },
+    getPerformanceMetrics() { return collectSceneMetrics(assemblyRoot); },
     dispose,
   };
 }

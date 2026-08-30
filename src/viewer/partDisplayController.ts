@@ -8,6 +8,8 @@ export interface PartDisplayState {
   transparent: boolean;
 }
 
+export type PartDisplaySnapshot = ReadonlyMap<string, PartDisplayState>;
+
 export class PartDisplayController {
   private readonly partIndex: ReadonlyMap<string, Object3D>;
   readonly visibility: VisibilityController;
@@ -66,6 +68,28 @@ export class PartDisplayController {
 
   apply(): void {
     if (!this.disposed) this.visibility.refresh();
+  }
+
+  snapshot(): PartDisplaySnapshot {
+    return new Map(
+      [...this.partIndex.keys()].map((partId) => [partId, this.getState(partId)]),
+    );
+  }
+
+  restore(snapshot: PartDisplaySnapshot): void {
+    if (this.disposed) return;
+    this.visibility.resetVisibility();
+    let isolatedPartId: string | null = null;
+    for (const [partId, state] of snapshot) {
+      const target = this.partIndex.get(partId);
+      if (!target) continue;
+      if (state.hidden) this.visibility.hide(target);
+      if (state.transparent) this.visibility.ghost(target);
+      if (state.isolated) isolatedPartId = partId;
+    }
+    const isolated = isolatedPartId ? this.partIndex.get(isolatedPartId) : undefined;
+    if (isolated) this.visibility.isolate(isolated);
+    this.visibility.refresh();
   }
 
   dispose(): void {
