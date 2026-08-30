@@ -6,7 +6,8 @@ const environment = (globalThis as {
 const executablePath = environment?.PLAYWRIGHT_EXECUTABLE_PATH;
 
 export default defineConfig({
-  testDir: 'tests/e2e',
+  testDir: './tests/e2e',
+  snapshotPathTemplate: 'tests/e2e/__screenshots__/{arg}{ext}',
   timeout: 60_000,
   fullyParallel: false,
   workers: 1,
@@ -19,9 +20,9 @@ export default defineConfig({
     viewport: { width: 1440, height: 900 },
   },
   projects: executablePath
-    ? [{ name: 'chromium' }]
+    ? [{ name: 'chromium', use: { viewport: { width: 1440, height: 900 } } }]
     : [
-        { name: 'chrome', use: { channel: 'chrome' } },
-        { name: 'edge', use: { channel: 'msedge' } },
+        { name: 'chrome', use: { channel: 'chrome', viewport: { width: 1440, height: 900 } } },
+        { name: 'edge', use: { channel: 'msedge', viewport: { width: 1440, height: 900 } } },
       ],
 });
