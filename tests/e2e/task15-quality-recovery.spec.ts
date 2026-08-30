@@ -11,23 +11,30 @@ test('switches high and low transactionally without losing interaction state', a
 
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/');
-  await expect(page.locator('.load-progress')).toHaveText('2 / 8', { timeout: 30_000 });
-  await page.getByLabel('搜索相机部件').fill('Z50II-02-001');
-  await page.getByTestId('part-Z50II-02-001').click();
+  await page.getByTestId('load-all-modules').click();
+  await expect(page.locator('.load-progress')).toHaveText('8 / 8', { timeout: 30_000 });
+  await page.getByLabel('搜索相机部件').fill('Z50II-08-011');
+  await page.getByTestId('part-Z50II-08-011').click();
   await page.getByTestId('mode-free').click();
+  const root = page.locator('.app-shell');
+  const assembledMatrix = await root.getAttribute('data-selected-transform-basis');
   await page.getByTestId('part-progress').evaluate((element) => {
     (element as HTMLInputElement).value = '500';
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
   });
+  await expect(page.getByTestId('part-progress-live')).toHaveText('50%');
   await page.getByTestId('ghost-selected').click();
 
-  const root = page.locator('.app-shell');
   const before = await root.evaluate((element) => ({
     progress: element.getAttribute('data-assembly-progress'),
     mode: (element as HTMLElement).dataset.interactionMode,
     selected: (element as HTMLElement).dataset.selectedTransformBasis,
   }));
+  const assembledValues = assembledMatrix!.split(',').map(Number);
+  const movedValues = before.selected!.split(',').map(Number);
+  expect(movedValues).toHaveLength(16);
+  expect(movedValues.slice(12, 15)).not.toEqual(assembledValues.slice(12, 15));
 
   await page.getByTestId('quality-profile').selectOption('low');
   await expect(root).toHaveAttribute('data-quality-effective', 'low');
@@ -53,6 +60,52 @@ test('switches high and low transactionally without losing interaction state', a
   await expect(page.getByTestId('ghost-selected')).toHaveAttribute('aria-pressed', 'true');
   await page.screenshot({ path: `${evidenceDir}/task-15-quality-low-high.png` });
   expect(errors).toEqual([]);
+});
+
+test('leaves the mounted high root and transform intact when low replacement fails', async ({ page }) => {
+  let failuresRemaining = 1;
+  await page.route('**/low/08_io_flex_fasteners.glb', async (route) => {
+    if (failuresRemaining > 0) {
+      failuresRemaining -= 1;
+      await route.abort();
+      return;
+    }
+    await route.continue();
+  });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('/');
+  await page.getByTestId('load-all-modules').click();
+  await expect(page.locator('.load-progress')).toHaveText('8 / 8', { timeout: 30_000 });
+  await page.getByLabel('搜索相机部件').fill('Z50II-08-011');
+  await page.getByTestId('part-Z50II-08-011').click();
+  await page.getByTestId('mode-free').click();
+  await page.getByTestId('part-progress').evaluate((element) => {
+    (element as HTMLInputElement).value = '500';
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const root = page.locator('.app-shell');
+  const before = await root.getAttribute('data-selected-transform-basis');
+  const row = page.locator('.module-group[data-module-id="08_io_flex_fasteners"]');
+
+  await page.getByTestId('quality-profile').selectOption('low');
+  await expect(row.locator('.module-status')).toContainText('加载失败', { timeout: 30_000 });
+  await expect(row).toHaveAttribute('data-quality', 'high');
+  await expect(row).toHaveAttribute('data-requested-quality', 'low');
+  await expect(root).toHaveAttribute('data-selected-transform-basis', before!);
+  await expect(page.getByTestId('part-name-zh')).toBeVisible();
+  await expect(page.locator('.load-progress')).toHaveText('8 / 8');
+  await page.screenshot({ path: `${evidenceDir}/task-15-failed-low-retains-high.png` });
+
+  const retry = page.getByTestId('retry-08_io_flex_fasteners');
+  await retry.evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    (button as HTMLButtonElement).click();
+  });
+  await expect(row.locator('.module-status')).toContainText('已加载', { timeout: 30_000 });
+  await expect(row).toHaveAttribute('data-quality', 'low');
+  await expect(row).toHaveAttribute('data-retry-count', '1');
+  await expect(root).toHaveAttribute('data-selected-transform-basis', before!);
 });
 
 test('offers a concurrency-safe retry and keeps the current scene until recovery', async ({ page }) => {
@@ -114,3 +167,29 @@ test('shows a Chinese compatibility message without a secondary crash when WebGL
   await expect(message).toContainText('桌面版 Edge');
   await expect(page.locator('canvas')).toHaveCount(0);
 });
+
+for (const failureMode of ['get-context-throws', 'renderer-constructor-throws'] as const) {
+  test(`shows compatibility UI when ${failureMode}`, async ({ page }) => {
+    await page.addInitScript((mode) => {
+      const original = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function getContext(
+        this: HTMLCanvasElement,
+        type: string,
+        ...args: unknown[]
+      ) {
+        if (type === 'webgl2') {
+          if (mode === 'get-context-throws') throw new Error('context blocked');
+          return {} as WebGL2RenderingContext;
+        }
+        return (original as (...callArgs: unknown[]) => unknown).call(this, type, ...args);
+      } as typeof HTMLCanvasElement.prototype.getContext;
+    }, failureMode);
+    await page.goto('/');
+
+    const message = page.getByTestId('webgl-compatibility');
+    await expect(message).toContainText('WebGL2');
+    await expect(message).toContainText('桌面版 Chrome');
+    await expect(message).toContainText('桌面版 Edge');
+    await expect(page.locator('canvas')).toHaveCount(0);
+  });
+}

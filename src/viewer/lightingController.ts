@@ -38,6 +38,7 @@ export class LightingController {
   private readonly fill = new DirectionalLight(0x91b9d2, 0.3);
   private readonly rim = new DirectionalLight(0xffddb4, 0.5);
   private currentPreset: LightingPreset = 'studio';
+  private qualityEnvironmentIntensity = 1;
   private disposed = false;
 
   constructor(
@@ -90,6 +91,14 @@ export class LightingController {
     this.applyPreset();
   }
 
+  setQualityEnvironmentIntensity(intensity: number): void {
+    if (this.disposed) return;
+    const normalized = Math.max(0, intensity);
+    if (this.qualityEnvironmentIntensity === normalized) return;
+    this.qualityEnvironmentIntensity = normalized;
+    this.applyPreset();
+  }
+
   refresh(): void {
     if (!this.disposed) this.visibility.refresh();
   }
@@ -111,7 +120,8 @@ export class LightingController {
   private applyPreset(): void {
     const inspection = this.currentPreset === 'inspection';
     this.renderer.toneMappingExposure = inspection ? 1.15 : 1;
-    this.scene.environmentIntensity = inspection ? 0.12 : 0.22;
+    this.scene.environmentIntensity = (inspection ? 0.12 : 0.22)
+      * this.qualityEnvironmentIntensity;
     this.ambient.intensity = inspection ? 0.42 : 0.12;
     this.key.intensity = inspection ? 0.55 : 0.75;
     this.fill.intensity = inspection ? 0.45 : 0.3;

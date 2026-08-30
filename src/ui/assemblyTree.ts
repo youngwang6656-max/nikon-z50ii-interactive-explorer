@@ -232,7 +232,10 @@ export function mountAssemblyTree(
       if (!row) return;
       row.dataset.status = status;
       row.dataset.retryCount = String(retryCount);
-      if (moduleQuality) row.dataset.quality = moduleQuality;
+      if (moduleQuality) {
+        row.dataset.requestedQuality = moduleQuality;
+        if (status === 'ready') row.dataset.quality = moduleQuality;
+      }
       row.title = error ?? '';
       const label = status === 'ready'
         ? '已加载'

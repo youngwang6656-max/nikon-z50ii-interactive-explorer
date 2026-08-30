@@ -250,7 +250,7 @@ export async function createApp(
       try {
         const state = moduleLoader.getState(moduleId, quality);
         const loaded = await (state.status === 'failed'
-          ? moduleLoader.retry(moduleId)
+          ? moduleLoader.retry(moduleId, quality)
           : moduleLoader.load(moduleId, quality));
         if (disposed) {
           disposeObjectTree(loaded.root);
@@ -282,6 +282,9 @@ export async function createApp(
     shell.root.dataset.qualityMode = qualityController.mode;
     shell.root.dataset.qualityEffective = effective;
     viewer.setQualityProfile?.(QUALITY_PROFILES[effective]);
+    lightingController?.setQualityEnvironmentIntensity(
+      QUALITY_PROFILES[effective].environmentIntensity,
+    );
     assemblyTree?.setQuality(qualityController.mode, effective);
   };
 
@@ -312,7 +315,7 @@ export async function createApp(
     }
     if (object.matrixAutoUpdate) object.updateMatrix();
     shell.root.dataset.selectedTransformBasis = object.matrix.elements
-      .slice(0, 12)
+      .slice(0, 16)
       .map((value) => Number(value.toPrecision(15)))
       .join(',');
   };

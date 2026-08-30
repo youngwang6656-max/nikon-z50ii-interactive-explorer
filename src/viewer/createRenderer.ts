@@ -178,22 +178,32 @@ export function createViewer(container: HTMLElement): Viewer {
   const canvas = document.createElement('canvas');
   canvas.className = 'viewer-canvas';
   container.append(canvas);
-  const context = canvas.getContext('webgl2', {
-    alpha: false,
-    antialias: true,
-    depth: true,
-    powerPreference: 'high-performance',
-  });
-  if (!context) {
-    canvas.replaceWith(createWebGLCompatibilityMessage());
+  const failWebGLInitialization = (): never => {
+    const message = createWebGLCompatibilityMessage();
+    if (canvas.isConnected) canvas.replaceWith(message);
+    else container.replaceChildren(message);
     throw new WebGLCompatibilityError();
+  };
+
+  let renderer!: WebGLRenderer;
+  try {
+    const context = canvas.getContext('webgl2', {
+      alpha: false,
+      antialias: true,
+      depth: true,
+      powerPreference: 'high-performance',
+    });
+    if (!context) failWebGLInitialization();
+    renderer = new WebGLRenderer({
+      canvas,
+      context: context as unknown as WebGLRenderingContext,
+      antialias: true,
+      alpha: false,
+    });
+  } catch (error) {
+    if (error instanceof WebGLCompatibilityError) throw error;
+    failWebGLInitialization();
   }
-  const renderer = new WebGLRenderer({
-    canvas,
-    context,
-    antialias: true,
-    alpha: false,
-  });
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.65;
@@ -345,7 +355,6 @@ export function createViewer(container: HTMLElement): Viewer {
     gtaoPass.blendIntensity = profile.aoIntensity;
     gtaoPass.updateGtaoMaterial({ samples: profile.aoSamples });
     gtaoPass.updatePdMaterial({ samples: Math.max(4, profile.aoSamples / 2) });
-    scene.environmentIntensity = 0.22 * profile.environmentIntensity;
     scene.traverse((object) => {
       if (!(object instanceof DirectionalLight) || !object.castShadow) return;
       object.shadow.mapSize.set(profile.shadowMapSize, profile.shadowMapSize);

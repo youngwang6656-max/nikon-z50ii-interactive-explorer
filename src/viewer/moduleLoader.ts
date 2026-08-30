@@ -1,4 +1,5 @@
 import {
+  Color,
   LoadingManager,
   Material,
   Mesh,
@@ -115,8 +116,11 @@ export function neutralizeFailedMaterialTextures(
           failedTextures.add(value);
         }
       }
+      const color = (replacement as Material & { color?: unknown }).color;
+      if (color instanceof Color) {
+        color.setHex(0x777777);
+      }
       if (replacement instanceof MeshStandardMaterial) {
-        replacement.color.setHex(0x777777);
         replacement.emissive.setHex(0x000000);
       }
       replacement.userData.failedTextureUrls = [...failedTextureUrls];
@@ -218,8 +222,6 @@ export class ModuleLoader {
   private readonly fetcher: ModuleFetcher;
   private readonly promiseCache = new Map<string, Promise<LoadedModule>>();
   private readonly states = new Map<string, ModuleLoadState>();
-  private readonly lastQuality = new Map<string, QualityLevel>();
-  private readonly lastFailedQuality = new Map<string, QualityLevel>();
   private readonly failedTextureUrls = new Map<string, readonly string[]>();
   private disposed = false;
 
@@ -245,7 +247,6 @@ export class ModuleLoader {
     const cached = this.promiseCache.get(key);
     if (cached) return cached;
 
-    this.lastQuality.set(moduleId, quality);
     const previous = this.states.get(key);
     this.states.set(key, {
       status: 'loading',
@@ -296,10 +297,6 @@ export class ModuleLoader {
           retryCount: this.states.get(key)?.retryCount ?? 0,
         });
         this.failedTextureUrls.set(key, [...failedTextureUrls]);
-        if (this.lastFailedQuality.get(moduleId) === quality) {
-          this.lastFailedQuality.delete(moduleId);
-        }
-
         return { moduleId, quality, root: scene, partIndex };
       })
       .catch((error: unknown) => {
@@ -310,7 +307,6 @@ export class ModuleLoader {
             error: describeError(error),
             retryCount: this.states.get(key)?.retryCount ?? 0,
           });
-          this.lastFailedQuality.set(moduleId, quality);
         }
         throw error;
       });
@@ -319,11 +315,10 @@ export class ModuleLoader {
     return promise;
   }
 
-  retry(moduleId: string): Promise<LoadedModule> {
+  retry(moduleId: string, quality: QualityLevel): Promise<LoadedModule> {
     this.requireActive();
     this.requireModule(moduleId);
-    const quality =
-      this.lastFailedQuality.get(moduleId) ?? this.lastQuality.get(moduleId) ?? 'high';
+    this.requireQuality(quality);
     const key = moduleKey(moduleId, quality);
     const state = this.getState(moduleId, quality);
     if (state.status === 'loading') {

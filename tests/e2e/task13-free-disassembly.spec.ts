@@ -71,7 +71,12 @@ test('free disassembly supports constrained drag, dependency guidance, undo/canc
   await page.mouse.up();
   const draggedValue = await range.inputValue();
   expect(Number(draggedValue)).toBeGreaterThan(0);
-  await expect(root).toHaveAttribute('data-selected-transform-basis', basisBeforeDrag!);
+  const basisAfterDrag = await root.getAttribute('data-selected-transform-basis');
+  const beforeDragValues = basisBeforeDrag!.split(',').map(Number);
+  const afterDragValues = basisAfterDrag!.split(',').map(Number);
+  expect(afterDragValues).toHaveLength(16);
+  expect(afterDragValues.slice(0, 12)).toEqual(beforeDragValues.slice(0, 12));
+  expect(afterDragValues.slice(12, 15)).not.toEqual(beforeDragValues.slice(12, 15));
   await page.screenshot({ path: `${evidenceDir}/task-13-free-drag-desktop.png` });
 
   await page.getByTestId('reset-assembly').click();

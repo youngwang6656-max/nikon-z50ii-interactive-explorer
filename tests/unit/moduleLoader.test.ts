@@ -2,6 +2,7 @@ import {
   BufferGeometry,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
   Texture,
@@ -128,7 +129,7 @@ describe('ModuleLoader', () => {
     });
     expect(loader.load('01_chassis_front', 'low')).toBe(failed);
 
-    const recovered = await loader.retry('01_chassis_front');
+    const recovered = await loader.retry('01_chassis_front', 'low');
 
     expect(recovered.quality).toBe('low');
     expect(calls).toBe(2);
@@ -148,7 +149,7 @@ describe('ModuleLoader', () => {
     const loader = new ModuleLoader(manifest, fetcher);
 
     await expect(loader.load('01_chassis_front', 'high')).rejects.toThrow('offline');
-    await expect(loader.retry('01_chassis_front')).rejects.toBe('decoder unavailable');
+    await expect(loader.retry('01_chassis_front', 'high')).rejects.toBe('decoder unavailable');
 
     expect(loader.getState('01_chassis_front', 'high')).toEqual({
       status: 'failed',
@@ -167,14 +168,42 @@ describe('ModuleLoader', () => {
     const loader = new ModuleLoader(manifest, fetcher);
     await expect(loader.load('01_chassis_front', 'high')).rejects.toThrow('offline');
 
-    const first = loader.retry('01_chassis_front');
-    const concurrent = loader.retry('01_chassis_front');
+    const first = loader.retry('01_chassis_front', 'high');
+    const concurrent = loader.retry('01_chassis_front', 'high');
 
     expect(concurrent).toBe(first);
     expect(loader.getState('01_chassis_front', 'high').retryCount).toBe(1);
     resolveRetry?.({ scene: sceneWithParts('Z50II-01-001') });
     await expect(first).resolves.toMatchObject({ quality: 'high' });
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries only the explicitly requested quality after both profiles fail', async () => {
+    const attempts = new Map<string, number>();
+    const fetcher = vi.fn(async (url: string) => {
+      const count = (attempts.get(url) ?? 0) + 1;
+      attempts.set(url, count);
+      if (count === 1) throw new Error(url.includes('/high/') ? 'high failed' : 'low failed');
+      return { scene: sceneWithParts('Z50II-01-001') };
+    });
+    const loader = new ModuleLoader(manifest, fetcher);
+    await expect(loader.load('01_chassis_front', 'high')).rejects.toThrow('high failed');
+    await expect(loader.load('01_chassis_front', 'low')).rejects.toThrow('low failed');
+
+    const recoveredHigh = await loader.retry('01_chassis_front', 'high');
+
+    expect(recoveredHigh.quality).toBe('high');
+    expect(loader.getState('01_chassis_front', 'high')).toMatchObject({
+      status: 'ready',
+      retryCount: 1,
+    });
+    expect(loader.getState('01_chassis_front', 'low')).toMatchObject({
+      status: 'failed',
+      error: 'low failed',
+      retryCount: 0,
+    });
+    expect(attempts.get('assets/models/high/01.glb')).toBe(2);
+    expect(attempts.get('assets/models/low/01.glb')).toBe(1);
   });
 
   it('neutralizes only materials whose texture failed and records the failed URL', async () => {
@@ -203,6 +232,28 @@ describe('ModuleLoader', () => {
     expect(loader.getFailedTextureUrls('01_chassis_front', 'high')).toEqual([failedUrl]);
   });
 
+  it('neutralizes a failed unlit material without mutating an unrelated magenta material', async () => {
+    const scene = sceneWithParts('Z50II-01-001');
+    const failedMaterial = new MeshBasicMaterial({ color: 0xff00ff });
+    const unrelatedMaterial = new MeshBasicMaterial({ color: 0xff00ff });
+    const affected = new Mesh(new BufferGeometry(), failedMaterial);
+    const unaffected = new Mesh(new BufferGeometry(), unrelatedMaterial);
+    scene.children[0]!.add(affected, unaffected);
+    const failedUrl = 'https://example.test/textures/missing-unlit.png';
+    const loader = new ModuleLoader(manifest, async () => ({
+      scene,
+      failedTextureUrls: [failedUrl],
+      failedMaterials: [failedMaterial],
+    }));
+
+    await loader.load('01_chassis_front', 'high');
+
+    expect(affected.material).not.toBe(failedMaterial);
+    expect((affected.material as MeshBasicMaterial).color.getHex()).toBe(0x777777);
+    expect(unaffected.material).toBe(unrelatedMaterial);
+    expect(unrelatedMaterial.color.getHex()).toBe(0xff00ff);
+  });
+
   it('does not neutralize a material when there are no failed texture URLs', () => {
     const scene = new Group();
     const material = new MeshStandardMaterial({ color: 0xff00ff, map: new Texture() });
@@ -220,7 +271,7 @@ describe('ModuleLoader', () => {
 
     await loader.load('01_chassis_front', 'high');
 
-    expect(() => loader.retry('01_chassis_front')).toThrow(
+    expect(() => loader.retry('01_chassis_front', 'high')).toThrow(
       'Cannot retry 01_chassis_front:high because its state is ready',
     );
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -299,7 +350,10 @@ describe('ModuleLoader', () => {
       loader.load('01_chassis_front', 'medium' as QualityLevel),
     ).toThrow('Unknown quality: medium');
     expect(() => loader.getState('99_unknown', 'high')).toThrow('Unknown module: 99_unknown');
-    expect(() => loader.retry('99_unknown')).toThrow('Unknown module: 99_unknown');
+    expect(() => loader.retry('99_unknown', 'high')).toThrow('Unknown module: 99_unknown');
+    expect(() => loader.retry('01_chassis_front', 'medium' as QualityLevel)).toThrow(
+      'Unknown quality: medium',
+    );
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -348,7 +402,7 @@ describe('ModuleLoader', () => {
 
     loader.dispose();
 
-    expect(() => loader.retry('01_chassis_front')).toThrow(
+    expect(() => loader.retry('01_chassis_front', 'low')).toThrow(
       'ModuleLoader has been disposed',
     );
     expect(loader.getState('01_chassis_front', 'low')).toEqual(beforeDispose);

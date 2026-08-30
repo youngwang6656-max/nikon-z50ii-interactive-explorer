@@ -97,4 +97,23 @@ describe('LightingController', () => {
     expect(shadowMapDispose).toHaveBeenCalledTimes(1);
     expect(shadowMapPassDispose).toHaveBeenCalledTimes(1);
   });
+
+  it('composes quality environment scale with the active lighting preset', () => {
+    const scene = new Scene();
+    const visibility = new VisibilityController([]);
+    const controller = new LightingController({ toneMappingExposure: 1 }, scene, visibility);
+
+    expect(scene.environmentIntensity).toBeCloseTo(0.22);
+    controller.setQualityEnvironmentIntensity(0.55);
+    expect(scene.environmentIntensity).toBeCloseTo(0.121);
+
+    controller.setPreset('inspection');
+    expect(scene.environmentIntensity).toBeCloseTo(0.066);
+    controller.setQualityEnvironmentIntensity(1);
+    expect(scene.environmentIntensity).toBeCloseTo(0.12);
+
+    controller.setPreset('studio');
+    expect(scene.environmentIntensity).toBeCloseTo(0.22);
+    controller.dispose();
+  });
 });
