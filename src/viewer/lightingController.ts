@@ -2,6 +2,7 @@ import {
   AmbientLight,
   DirectionalLight,
   Group,
+  Light,
   Mesh,
   Object3D,
   Scene,
@@ -101,6 +102,9 @@ export class LightingController {
     this.shadowMaterials.forEach(({ material, opacity }) => { material.opacity = opacity; });
     this.replacedLights.forEach(({ object, visible }) => { object.visible = visible; });
     this.scene.remove(this.rig);
+    this.rig.traverse((object) => {
+      if (object instanceof Light) object.dispose();
+    });
     this.disposed = true;
   }
 
@@ -112,8 +116,8 @@ export class LightingController {
     this.key.intensity = inspection ? 0.55 : 0.75;
     this.fill.intensity = inspection ? 0.45 : 0.3;
     this.rim.intensity = inspection ? 0.3 : 0.5;
-    this.shadowMaterials.forEach(({ material }) => {
-      material.opacity = inspection ? 0.16 : 0.32;
+    this.shadowMaterials.forEach(({ material, opacity }) => {
+      material.opacity = inspection ? Math.min(opacity, 0.16) : opacity;
     });
     this.visibility.setInspectionMode(inspection);
   }

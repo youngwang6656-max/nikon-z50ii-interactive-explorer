@@ -82,4 +82,46 @@ describe('camera preset tween', () => {
     expect(controls.target.y).toBeCloseTo(0.02, 12);
     expect(controls.target.z).toBeCloseTo(-0.03, 12);
   });
+
+  it.each([0.4, 1, 2.4])(
+    'keeps every visible bound corner inside NDC for aspect %s',
+    (aspect) => {
+      const camera = new PerspectiveCamera(40, aspect, 0.01, 10);
+      const controls = new FakeControls();
+      const visible = new Mesh(new BoxGeometry(0.2, 0.1, 0.08));
+      visible.position.set(0.04, 0.02, -0.03);
+      visible.updateMatrixWorld(true);
+      const tween = new CameraPresetTween(camera, controls, {
+        reducedMotion: true,
+        getVisibleObjects: () => [visible],
+      });
+      const expectedDirections = {
+        front: new Vector3(0, 0.04, 0.25).normalize(),
+        rear: new Vector3(0, 0.04, -0.25).normalize(),
+        left: new Vector3(-0.25, 0.04, 0).normalize(),
+        right: new Vector3(0.25, 0.04, 0).normalize(),
+        top: new Vector3(0, 0.25, 0.02).normalize(),
+        'three-quarter': new Vector3(0.165, 0.115, 0.205).normalize(),
+      };
+
+      for (const [preset, expectedDirection] of Object.entries(expectedDirections)) {
+        tween.start(preset);
+        camera.updateProjectionMatrix();
+        camera.updateMatrixWorld(true);
+        const actualDirection = camera.position.clone().sub(controls.target).normalize();
+        expect(actualDirection.dot(expectedDirection)).toBeGreaterThan(0.999999);
+        for (const x of [-0.1, 0.1]) {
+          for (const y of [-0.05, 0.05]) {
+            for (const z of [-0.04, 0.04]) {
+              const ndc = new Vector3(0.04 + x, 0.02 + y, -0.03 + z).project(camera);
+              expect(Math.abs(ndc.x)).toBeLessThanOrEqual(1);
+              expect(Math.abs(ndc.y)).toBeLessThanOrEqual(1);
+              expect(ndc.z).toBeGreaterThanOrEqual(-1);
+              expect(ndc.z).toBeLessThanOrEqual(1);
+            }
+          }
+        }
+      }
+    },
+  );
 });

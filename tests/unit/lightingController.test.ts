@@ -1,13 +1,14 @@
 import {
   AmbientLight,
   BoxGeometry,
+  DirectionalLight,
   Mesh,
   MeshStandardMaterial,
   PlaneGeometry,
   Scene,
   ShadowMaterial,
 } from 'three';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { LightingController } from '../../src/viewer/lightingController';
 import { VisibilityController } from '../../src/viewer/visibilityController';
@@ -18,7 +19,7 @@ describe('LightingController', () => {
     scene.environmentIntensity = 0.42;
     const legacy = new AmbientLight(0xffffff, 0.2);
     scene.add(legacy);
-    const floorMaterial = new ShadowMaterial({ opacity: 0.32 });
+    const floorMaterial = new ShadowMaterial({ opacity: 0.47 });
     const floor = new Mesh(new PlaneGeometry(), floorMaterial);
     floor.name = 'TECHNICAL_SHADOW_FLOOR';
     scene.add(floor);
@@ -40,6 +41,7 @@ describe('LightingController', () => {
     expect(scene.getObjectByName('Z50II_STUDIO_FILL')).not.toBeNull();
     expect(scene.getObjectByName('Z50II_STUDIO_RIM')).not.toBeNull();
     expect(first.material).toBe(shared);
+    expect(floorMaterial.opacity).toBe(0.47);
 
     controller.setPreset('inspection');
 
@@ -55,7 +57,7 @@ describe('LightingController', () => {
     controller.setPreset('studio');
 
     expect(renderer.toneMappingExposure).toBe(1);
-    expect(floorMaterial.opacity).toBe(0.32);
+    expect(floorMaterial.opacity).toBe(0.47);
     expect(first.material).toBe(shared);
     expect(second.material).toBe(shared);
 
@@ -64,5 +66,35 @@ describe('LightingController', () => {
     expect(scene.environmentIntensity).toBe(0.42);
     expect(legacy.visible).toBe(true);
     expect(scene.getObjectByName('Z50II_STUDIO_KEY')).toBeUndefined();
+  });
+
+  it('disposes every owned light and the key shadow render targets exactly once', () => {
+    const scene = new Scene();
+    const visibility = new VisibilityController([]);
+    const controller = new LightingController({ toneMappingExposure: 1 }, scene, visibility);
+    const directionalLights = [
+      'Z50II_STUDIO_KEY',
+      'Z50II_STUDIO_FILL',
+      'Z50II_STUDIO_RIM',
+    ].map((name) => scene.getObjectByName(name) as DirectionalLight);
+    const lightDisposals = directionalLights.map(() => vi.fn());
+    directionalLights.forEach((light, index) => {
+      light.addEventListener('dispose', lightDisposals[index]!);
+    });
+    const shadowMapDispose = vi.fn();
+    const shadowMapPassDispose = vi.fn();
+    directionalLights[0]!.shadow.map = {
+      dispose: shadowMapDispose,
+    } as unknown as NonNullable<typeof directionalLights[0]['shadow']['map']>;
+    directionalLights[0]!.shadow.mapPass = {
+      dispose: shadowMapPassDispose,
+    } as unknown as NonNullable<typeof directionalLights[0]['shadow']['mapPass']>;
+
+    controller.dispose();
+    controller.dispose();
+
+    lightDisposals.forEach((dispose) => expect(dispose).toHaveBeenCalledTimes(1));
+    expect(shadowMapDispose).toHaveBeenCalledTimes(1);
+    expect(shadowMapPassDispose).toHaveBeenCalledTimes(1);
   });
 });

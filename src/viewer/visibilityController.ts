@@ -40,17 +40,22 @@ function cloneAssignment(
 ): MaterialAssignment {
   const clone = (original: Material): Material => {
     const owned = original.clone();
+    const originalClippingPlanes = original.clippingPlanes;
     if (ghosted) {
       owned.opacity = 0.18;
       owned.transparent = true;
       owned.depthWrite = false;
     }
     if (clippingPlane) {
-      owned.clippingPlanes = [clippingPlane];
+      owned.clippingPlanes = originalClippingPlanes
+        ? [...originalClippingPlanes, clippingPlane]
+        : [clippingPlane];
       owned.clipIntersection = false;
       owned.clipShadows = true;
     } else {
-      owned.clippingPlanes = null;
+      owned.clippingPlanes = originalClippingPlanes
+        ? [...originalClippingPlanes]
+        : null;
     }
     if (inspection && owned instanceof MeshStandardMaterial) {
       owned.envMapIntensity = Math.min(owned.envMapIntensity, 0.28);

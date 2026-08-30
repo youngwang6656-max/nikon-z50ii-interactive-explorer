@@ -1,4 +1,4 @@
-import { BoxGeometry, Mesh, MeshStandardMaterial, Scene, Vector3 } from 'three';
+import { BoxGeometry, Mesh, MeshStandardMaterial, Plane, Scene, Vector3 } from 'three';
 import { describe, expect, it, vi } from 'vitest';
 
 import { CutawayController } from '../../src/viewer/cutawayController';
@@ -49,5 +49,44 @@ describe('CutawayController', () => {
 
     controller.dispose();
     expect(scene.children).not.toContain(controller.helper);
+  });
+
+  it('composes with ghost and inspection while preserving pre-existing clipping planes', () => {
+    const originalPlane = new Plane(new Vector3(0, 0, 1), -0.012);
+    const originalClipping = [originalPlane];
+    const original = new MeshStandardMaterial();
+    original.clippingPlanes = originalClipping;
+    const mesh = new Mesh(new BoxGeometry(), original);
+    const visibility = new VisibilityController([mesh]);
+    const controller = new CutawayController(
+      { localClippingEnabled: false },
+      new Scene(),
+      visibility,
+    );
+
+    visibility.ghost(mesh);
+    visibility.setInspectionMode(true);
+    expect((mesh.material as MeshStandardMaterial).clippingPlanes).toEqual(originalClipping);
+
+    controller.setEnabled(true);
+    expect((mesh.material as MeshStandardMaterial).clippingPlanes).toEqual([
+      originalPlane,
+      controller.plane,
+    ]);
+    expect(original.clippingPlanes).toBe(originalClipping);
+
+    controller.setEnabled(false);
+    expect(mesh.material).not.toBe(original);
+    expect((mesh.material as MeshStandardMaterial).clippingPlanes).toEqual(originalClipping);
+
+    visibility.unghost(mesh);
+    expect(mesh.material).not.toBe(original);
+    expect((mesh.material as MeshStandardMaterial).clippingPlanes).toEqual(originalClipping);
+    visibility.setInspectionMode(false);
+    expect(mesh.material).toBe(original);
+    expect(original.clippingPlanes).toBe(originalClipping);
+
+    controller.dispose();
+    visibility.dispose();
   });
 });

@@ -74,6 +74,16 @@ const PRELOAD_MODULE_IDS = new Set([
   '02_outer_shell_controls',
 ]);
 
+export function resetVisibilityAndRestoreSelection(
+  visibility: Pick<VisibilityController, 'resetVisibility'>,
+  selection: Pick<SelectionController, 'selectedPartId' | 'select'> | null,
+): string | null {
+  visibility.resetVisibility();
+  const selectedPartId = selection?.selectedPartId ?? null;
+  selection?.select(selectedPartId);
+  return selectedPartId;
+}
+
 async function loadPublicManifest(): Promise<AssemblyManifest> {
   const baseUrl = new URL(import.meta.env.BASE_URL, document.baseURI);
   const manifestUrl = new URL('assembly-manifest.json', baseUrl);
@@ -435,8 +445,10 @@ export async function createApp(
         updateSelectionUi(partId);
       },
       onVisibilityReset: () => {
-        visibilityController?.resetVisibility();
-        updateSelectionUi(selectionController?.selectedPartId ?? null);
+        const selectedPartId = visibilityController
+          ? resetVisibilityAndRestoreSelection(visibilityController, selectionController)
+          : (selectionController?.selectedPartId ?? null);
+        updateSelectionUi(selectedPartId);
       },
       onCutawayToggle: (enabled) => { cutawayController?.setEnabled(enabled); },
       onCutawayAxis: (axis) => { cutawayController?.setAxis(axis); },

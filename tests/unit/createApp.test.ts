@@ -16,6 +16,7 @@ import { describe, expect, it, vi } from 'vitest';
 import fixture from '../fixtures/assembly-manifest.valid.json';
 import {
   createApp,
+  resetVisibilityAndRestoreSelection,
   type AppDependencies,
 } from '../../src/app/createApp';
 import { parseManifest } from '../../src/domain/manifest';
@@ -23,6 +24,8 @@ import type { AppShell } from '../../src/ui/appShell';
 import type { TimelineCallbacks, TimelineController } from '../../src/ui/timeline';
 import type { Viewer } from '../../src/viewer/createRenderer';
 import { ModuleLoader } from '../../src/viewer/moduleLoader';
+import { SelectionController } from '../../src/viewer/selectionController';
+import { VisibilityController } from '../../src/viewer/visibilityController';
 
 function fakeShell(): AppShell {
   return {
@@ -94,6 +97,37 @@ function trackedScene(): {
 }
 
 describe('createApp lifecycle', () => {
+  it('recomputes the unchanged selected outline after visibility reset', () => {
+    const partId = 'Z50II-01-001';
+    const assemblyRoot = new Group();
+    const part = new Group();
+    part.userData.partId = partId;
+    part.add(new Mesh(new BufferGeometry(), new MeshStandardMaterial()));
+    assemblyRoot.add(part);
+    const outlinePass = { selectedObjects: [] as Object3D[] };
+    const visibility = new VisibilityController([part]);
+    const selection = new SelectionController({
+      canvas: canvasStub(),
+      camera: new PerspectiveCamera(),
+      assemblyRoot,
+      outlinePass,
+      partIndex: new Map([[partId, part]]),
+    });
+
+    selection.select(partId);
+    expect(outlinePass.selectedObjects).toEqual([part]);
+    visibility.hide(part);
+    selection.select(partId);
+    expect(selection.selectedPartId).toBe(partId);
+    expect(outlinePass.selectedObjects).toEqual([]);
+
+    expect(resetVisibilityAndRestoreSelection(visibility, selection)).toBe(partId);
+    expect(outlinePass.selectedObjects).toEqual([part]);
+
+    selection.dispose();
+    visibility.dispose();
+  });
+
   it('does not attach a late preload root after app disposal and releases it once', async () => {
     const manifest = parseManifest({
       ...fixture,

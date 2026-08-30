@@ -20,12 +20,17 @@ test('inspection tools compose reversibly and expose six fitted camera presets',
   await expect(page.locator('.load-progress')).toHaveText('2 / 8', { timeout: 30_000 });
   await selectPart(page, 'Z50II-02-001');
 
+  const root = page.locator('.app-shell');
   for (const preset of ['front', 'rear', 'left', 'right', 'top', 'three-quarter']) {
-    await expect(page.getByTestId(`camera-preset-${preset}`)).toBeVisible();
+    const button = page.getByTestId(`camera-preset-${preset}`);
+    await expect(button).toBeVisible();
+    await button.click();
+    await expect(root).toHaveAttribute('data-camera-tween-active', 'true');
+    await expect(root).toHaveAttribute('data-camera-tween-active', 'false');
+    if (preset === 'front') {
+      await page.screenshot({ path: `${evidenceDir}/task-14-camera-front.png` });
+    }
   }
-  await page.getByTestId('camera-preset-front').click();
-  await page.waitForTimeout(650);
-  await page.screenshot({ path: `${evidenceDir}/task-14-camera-front.png` });
 
   await page.getByTestId('ghost-selected').click();
   await expect(page.getByTestId('ghost-selected')).toHaveAttribute('aria-pressed', 'true');
@@ -37,7 +42,8 @@ test('inspection tools compose reversibly and expose six fitted camera presets',
   await expect(page.getByTestId('isolate-selected')).toHaveAttribute('aria-pressed', 'false');
 
   await page.getByTestId('camera-preset-three-quarter').click();
-  await page.waitForTimeout(650);
+  await expect(root).toHaveAttribute('data-camera-tween-active', 'true');
+  await expect(root).toHaveAttribute('data-camera-tween-active', 'false');
   await page.getByTestId('cutaway-axis').selectOption('x');
   await page.getByTestId('cutaway-offset').evaluate((input) => {
     (input as HTMLInputElement).value = '0';

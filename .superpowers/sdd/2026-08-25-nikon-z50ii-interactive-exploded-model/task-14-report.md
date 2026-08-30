@@ -43,3 +43,30 @@ All four 1440 × 960 screenshots were inspected at original resolution. Full E2E
 - `git diff --cached --check` — clean before the implementation commit.
 
 The bundled Node directory was prepended to `PATH` for pnpm child scripts in this shell. Vite continues to emit the pre-existing advisory that the main Three.js chunk exceeds 500 kB; it does not fail the build. The in-app live-browser runtime was blocked by a Windows sandbox ACL setup error, so interactive correctness used the project's real-Chrome E2E runner and visual QA used the generated original-resolution screenshots.
+
+## Independent review Round 1
+
+The Round 1 package identified four state/lifecycle defects and two camera-test gaps. Each defect was verified against the current implementation before changes.
+
+### RED evidence
+
+- Added a real `SelectionController` + `VisibilityController` regression for hide → unchanged select → visibility reset. The selected part ID remained stable while the outline array stayed empty; the desired reset helper was absent (`resetVisibilityAndRestoreSelection is not a function`).
+- Added combined ghost + inspection + cutaway coverage with a source material already carrying one clipping plane. The first owned ghost clone returned `clippingPlanes: null` instead of preserving the source plane.
+- Changed the lighting fixture's floor shadow opacity from the default-like `0.32` to `0.47`. Studio construction returned `0.32`, proving that preset code overwrote the captured source value.
+- Attached disposal listeners to all three owned directional lights and installed controlled key-shadow `map`/`mapPass` targets. Double controller disposal produced zero light and render-target disposal calls.
+- The combined RED run was 3 files with 4 failed / 5 passed tests, with each failure matching one review finding.
+
+### Fixes and focused GREEN evidence
+
+- Visibility reset now restores visibility, explicitly reselects the unchanged selected part so `SelectionController.select()` recomputes effective visibility and the outline, and only then refreshes inspector/action state. `createApp.test.ts`: 5/5 passed.
+- Material recomposition now copies every pre-existing clipping plane into owned ghost/inspection clones and appends the Task 14 plane without mutating the source array. Disabling cutaway while ghost/inspection remains active recomposes the clone with only the original planes; removing all effects restores the exact original material and clipping-array reference. Visibility/display/cutaway: 3 files / 9 tests passed.
+- Studio uses each captured `ShadowMaterial.opacity`; inspection applies `min(originalOpacity, 0.16)`, so it never makes an already softer source shadow darker. Lighting teardown traverses the owned rig and calls `dispose()` on every light; Three.js `DirectionalLight.dispose()` releases its shadow `map` and `mapPass`. Lighting: 2/2 passed, including idempotent double disposal.
+- Camera tests project all eight visible box corners through front, rear, left, right, top, and three-quarter cameras at aspect ratios `0.4`, `1`, and `2.4`; every corner remains inside NDC and every camera direction matches its preset. Camera: 7/7 passed.
+- Complete focused review set: 7 files / 32 tests passed.
+
+### Rebuilt browser and final evidence
+
+- Task 14 E2E now clicks every one of the six camera buttons and observes the real application root transition `data-camera-tween-active=true → false` for each preset. The focused rebuilt Chrome run passed 1/1.
+- `scripts/pnpm.ps1 check`: 18 files / 107 tests passed; TypeScript and the production Vite build passed.
+- Rebuilt `scripts/pnpm.ps1 test:e2e`: 4/4 Chrome suites passed. The runner-regenerated Task 11–13 screenshots were restored exactly afterward.
+- The four updated Task 14 screenshots were inspected again at 1440 × 960. Front fit remains centered, ghost/isolate retains the cyan selected outline, the cutaway helper remains bounded and translucent, and inspection lighting remains independently readable.
