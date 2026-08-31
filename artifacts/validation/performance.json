@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedBy": "tests/e2e/task15-performance.spec.ts",
-  "measuredAt": "2026-08-31T02:45:24.161Z",
+  "measuredAt": "2026-08-31T05:47:44.463Z",
   "methodology": {
     "viewport": {
       "width": 1920,
@@ -30,46 +30,46 @@
       },
       "profile": "high",
       "triangles": 223099,
-      "textureBytes": 314572800,
+      "textureBytes": 314573568,
       "textureBytesUnavailableReason": null,
       "repetitions": 3,
       "runs": [
         {
           "repetition": 1,
           "cacheState": "cold",
-          "initialLoadMs": 1139.633,
-          "allModulesLoadMs": 1355.391,
+          "initialLoadMs": 1071.636,
+          "allModulesLoadMs": 1211.154,
           "medianOrbitFps": 30.03,
           "orbitMovementFrames": 360,
           "orbitPointerMoves": 180,
-          "orbitInputDurationMs": 12176.8,
-          "minimumFullExplosionFps": 23.981
+          "orbitInputDurationMs": 12181.8,
+          "minimumFullExplosionFps": 23.923
         },
         {
           "repetition": 2,
           "cacheState": "warm",
-          "initialLoadMs": 1415.561,
-          "allModulesLoadMs": 1277.505,
+          "initialLoadMs": 1454.956,
+          "allModulesLoadMs": 858.29,
           "medianOrbitFps": 30.03,
           "orbitMovementFrames": 360,
           "orbitPointerMoves": 180,
-          "orbitInputDurationMs": 11644.1,
+          "orbitInputDurationMs": 11816,
           "minimumFullExplosionFps": 23.923
         },
         {
           "repetition": 3,
           "cacheState": "warm",
-          "initialLoadMs": 1329.733,
-          "allModulesLoadMs": 1226.306,
+          "initialLoadMs": 1092.761,
+          "allModulesLoadMs": 1279.87,
           "medianOrbitFps": 30.03,
-          "orbitMovementFrames": 362,
+          "orbitMovementFrames": 363,
           "orbitPointerMoves": 180,
-          "orbitInputDurationMs": 11763.1,
-          "minimumFullExplosionFps": 23.981
+          "orbitInputDurationMs": 11709.3,
+          "minimumFullExplosionFps": 23.923
         }
       ],
-      "initialLoadMs": 1329.733,
-      "allModulesLoadMs": 1277.505,
+      "initialLoadMs": 1092.761,
+      "allModulesLoadMs": 1211.154,
       "medianOrbitFps": 30.03,
       "minimumFullExplosionFps": 23.923
     },
@@ -84,48 +84,48 @@
       },
       "profile": "high",
       "triangles": 223099,
-      "textureBytes": 314572800,
+      "textureBytes": 314573568,
       "textureBytesUnavailableReason": null,
       "repetitions": 3,
       "runs": [
         {
           "repetition": 1,
           "cacheState": "cold",
-          "initialLoadMs": 823.033,
-          "allModulesLoadMs": 644.555,
+          "initialLoadMs": 866.391,
+          "allModulesLoadMs": 671.8,
           "medianOrbitFps": 59.524,
-          "orbitMovementFrames": 632,
+          "orbitMovementFrames": 638,
           "orbitPointerMoves": 180,
-          "orbitInputDurationMs": 13017.5,
+          "orbitInputDurationMs": 13172.9,
           "minimumFullExplosionFps": 29.94
         },
         {
           "repetition": 2,
           "cacheState": "warm",
-          "initialLoadMs": 1019.392,
-          "allModulesLoadMs": 1145.081,
+          "initialLoadMs": 953.629,
+          "allModulesLoadMs": 1184.981,
           "medianOrbitFps": 59.88,
-          "orbitMovementFrames": 609,
+          "orbitMovementFrames": 575,
           "orbitPointerMoves": 180,
-          "orbitInputDurationMs": 11720.5,
+          "orbitInputDurationMs": 10759.8,
           "minimumFullExplosionFps": 30.03
         },
         {
           "repetition": 3,
           "cacheState": "warm",
-          "initialLoadMs": 988.116,
-          "allModulesLoadMs": 786.248,
+          "initialLoadMs": 1070.571,
+          "allModulesLoadMs": 1134.866,
           "medianOrbitFps": 59.88,
-          "orbitMovementFrames": 563,
+          "orbitMovementFrames": 577,
           "orbitPointerMoves": 180,
-          "orbitInputDurationMs": 10564.1,
-          "minimumFullExplosionFps": 30.12
+          "orbitInputDurationMs": 10779.3,
+          "minimumFullExplosionFps": 23.981
         }
       ],
-      "initialLoadMs": 988.116,
-      "allModulesLoadMs": 786.248,
+      "initialLoadMs": 953.629,
+      "allModulesLoadMs": 1134.866,
       "medianOrbitFps": 59.88,
-      "minimumFullExplosionFps": 29.94
+      "minimumFullExplosionFps": 23.981
     }
   ]
 }

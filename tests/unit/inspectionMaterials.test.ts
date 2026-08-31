@@ -1,4 +1,4 @@
-import { Color, Group, Mesh, MeshPhysicalMaterial, MeshStandardMaterial } from 'three';
+import { Color, DataTexture, Group, Mesh, MeshPhysicalMaterial, MeshStandardMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 
 import { calibrateInspectionMaterials } from '../../src/viewer/createRenderer';
@@ -42,21 +42,35 @@ describe('inspection material calibration', () => {
 
     calibrateInspectionMaterials(root);
 
-    expect(sensor.color).toEqual(new Color(0x082c36));
+    expect(sensor.color).toEqual(new Color(0xffffff));
     expect(sensor.metalness).toBe(0);
-    expect(sensor.roughness).toBeGreaterThanOrEqual(0.7);
-    expect(sensor.envMapIntensity).toBe(0);
-    expect(sensor.clearcoat).toBe(0);
+    expect(sensor.roughness).toBeGreaterThanOrEqual(0.3);
+    expect(sensor.envMapIntensity).toBeGreaterThan(0);
+    expect(sensor.envMapIntensity).toBeLessThanOrEqual(0.15);
+    expect(sensor.clearcoat).toBeGreaterThan(0);
     expect(sensor.transmission).toBe(0);
-    expect(sensor.specularIntensity).toBe(0);
-    expect(sensor.iridescence).toBe(0);
-    expect(standardSensor.color).toEqual(new Color(0x082c36));
-    expect(standardSensor.roughness).toBeGreaterThanOrEqual(0.7);
-    expect(standardSensor.envMapIntensity).toBe(0);
-    expect(exportedSensor.color).toEqual(new Color(0x082c36));
+    expect(sensor.specularIntensity).toBeGreaterThan(0);
+    expect(sensor.iridescence).toBeGreaterThan(0);
+    expect(sensor.map).toBeInstanceOf(DataTexture);
+    const sensorTexels = (sensor.map as DataTexture).image.data as Uint8Array;
+    expect(new Set(Array.from(sensorTexels))).toHaveProperty('size');
+    expect(new Set(Array.from(sensorTexels)).size).toBeGreaterThan(8);
+    const spectralTexels: Array<[number, number, number]> = [];
+    for (let offset = 0; offset < sensorTexels.length; offset += 4) {
+      spectralTexels.push([sensorTexels[offset]!, sensorTexels[offset + 1]!, sensorTexels[offset + 2]!]);
+    }
+    expect(spectralTexels.some(([red, green, blue]) => blue > red * 1.5 && blue > green * 1.2)).toBe(true);
+    expect(spectralTexels.some(([red, green, blue]) => green > red * 1.5 && green > blue * 1.1)).toBe(true);
+    expect(spectralTexels.some(([red, green, blue]) => red > green * 1.5 && blue > green * 1.4)).toBe(true);
+    expect(standardSensor.color).toEqual(new Color(0xffffff));
+    expect(standardSensor.roughness).toBeGreaterThanOrEqual(0.3);
+    expect(standardSensor.envMapIntensity).toBeGreaterThan(0);
+    expect(standardSensor.map).toBeInstanceOf(DataTexture);
+    expect(exportedSensor.color).toEqual(new Color(0xffffff));
     expect(exportedSensor.metalness).toBe(0);
-    expect(exportedSensor.roughness).toBeGreaterThanOrEqual(0.7);
-    expect(exportedSensor.envMapIntensity).toBe(0);
+    expect(exportedSensor.roughness).toBeGreaterThanOrEqual(0.3);
+    expect(exportedSensor.envMapIntensity).toBeGreaterThan(0);
+    expect(exportedSensor.map).toBeInstanceOf(DataTexture);
     expect(metal.color.r).toBeLessThan(new Color(0x708090).r * 0.3);
     expect(metal.roughness).toBeGreaterThanOrEqual(0.8);
     expect(metal.envMapIntensity).toBeLessThanOrEqual(0.08);

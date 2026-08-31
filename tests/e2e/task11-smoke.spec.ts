@@ -21,7 +21,8 @@ test('selection, search, display commands, pointer gestures, and responsive insp
   const canvas = page.locator('.viewer-canvas');
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
-  await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  // Aim at the upper-right mount ring, not the now-visible sensor glass in the optical axis.
+  await page.mouse.click(box!.x + box!.width * 0.7, box!.y + box!.height * 0.25);
   const canvasSelected = page.locator('.part-row.is-selected');
   await expect(canvasSelected).toBeVisible();
   await expect(search).toHaveValue('传感器');

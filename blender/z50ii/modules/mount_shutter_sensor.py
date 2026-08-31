@@ -73,9 +73,13 @@ def _rectangular_frame(name, width, height, depth, location_y, collection, mater
 
 
 def _curtain(name, location_y, slant_deg, collection, material):
-    root = rounded_box(name, (26.5, 0.14, 2.7), (0, location_y, 7.4), 0.05, collection, material)
+    # In the assembled inspection pose the vertical-travel curtains are parked
+    # together in the upper cassette, leaving the DX aperture and its lower edge
+    # unobstructed. Their separated Y planes remain visible in exploded mode.
+    retracted_z = tuple(15.0 + 0.28 * index for index in range(7))
+    root = rounded_box(name, (26.5, 0.14, 2.7), (0, location_y, retracted_z[0]), 0.05, collection, material)
     root.rotation_euler[1] = radians(slant_deg)
-    for index, z in enumerate((4.9, 2.4, -0.1, -2.6, -5.1, -7.6), start=2):
+    for index, z in enumerate(retracted_z[1:], start=2):
         slat = rounded_box(f"{name}_lamella_{index:02d}", (26.5, 0.14, 2.7), (0, location_y, z), 0.05, collection, material)
         slat.rotation_euler[1] = radians(slant_deg)
         _parent(slat, root)

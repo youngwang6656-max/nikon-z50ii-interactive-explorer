@@ -2,8 +2,10 @@ import {
   ACESFilmicToneMapping,
   AmbientLight,
   Color,
+  DataTexture,
   DirectionalLight,
   Group,
+  LinearFilter,
   Mesh,
   Material,
   Object3D,
@@ -11,12 +13,14 @@ import {
   PerspectiveCamera,
   PlaneGeometry,
   PMREMGenerator,
+  RGBAFormat,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
   Scene,
   ShadowMaterial,
   SRGBColorSpace,
   Texture,
+  UnsignedByteType,
   Vector2,
   WebGLRenderer,
   WebGLRenderTarget,
@@ -129,6 +133,41 @@ export function collectSceneMetrics(scene: Object3D): SceneMetrics {
   };
 }
 
+function createSensorGlassTexture(): DataTexture {
+  const width = 24;
+  const height = 8;
+  const spectralStops = [
+    [25, 55, 115],
+    [25, 115, 70],
+    [105, 35, 105],
+  ] as const;
+  const data = new Uint8Array(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    const vertical = y / (height - 1);
+    for (let x = 0; x < width; x += 1) {
+      const spectralPhase = (x % 6) / 2;
+      const startIndex = Math.floor(spectralPhase) % spectralStops.length;
+      const endIndex = (startIndex + 1) % spectralStops.length;
+      const start = spectralStops[startIndex]!;
+      const end = spectralStops[endIndex]!;
+      const blend = spectralPhase - Math.floor(spectralPhase);
+      const offset = (y * width + x) * 4;
+      data[offset] = Math.round(start[0]! + (end[0]! - start[0]!) * blend + vertical * 5);
+      data[offset + 1] = Math.round(start[1]! + (end[1]! - start[1]!) * blend + (1 - vertical) * 4);
+      data[offset + 2] = Math.round(start[2]! + (end[2]! - start[2]!) * blend + vertical * 3);
+      data[offset + 3] = 255;
+    }
+  }
+  const texture = new DataTexture(data, width, height, RGBAFormat, UnsignedByteType);
+  texture.name = 'Z50II sensor glass spectral variation';
+  texture.colorSpace = SRGBColorSpace;
+  texture.magFilter = LinearFilter;
+  texture.minFilter = LinearFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 export function calibrateInspectionMaterials(root: Object3D): void {
   const calibrated = new Set<MeshStandardMaterial>();
   root.traverse((object) => {
@@ -151,15 +190,19 @@ export function calibrateInspectionMaterials(root: Object3D): void {
         material.needsUpdate = true;
         continue;
       }
-      material.color.setHex(0x082c36);
+      material.color.setHex(0xffffff);
       material.metalness = 0;
-      material.roughness = Math.max(material.roughness, 0.7);
-      material.envMapIntensity = 0;
+      material.roughness = Math.max(material.roughness, 0.34);
+      material.envMapIntensity = Math.min(Math.max(material.envMapIntensity, 0.1), 0.15);
+      material.map = createSensorGlassTexture();
       if (material instanceof MeshPhysicalMaterial) {
-        material.clearcoat = 0;
+        material.clearcoat = 0.18;
+        material.clearcoatRoughness = 0.24;
         material.transmission = 0;
-        material.specularIntensity = 0;
-        material.iridescence = 0;
+        material.specularIntensity = 0.22;
+        material.iridescence = 0.32;
+        material.iridescenceIOR = 1.3;
+        material.iridescenceThicknessRange = [180, 420];
       }
       material.needsUpdate = true;
     }

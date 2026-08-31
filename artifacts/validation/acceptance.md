@@ -28,7 +28,7 @@
 | PASS | 引导拆解可从完整装配态运行到完整爆炸态并返回。 | `tests/e2e/viewer.spec.ts` 在 Chrome 与 Edge 中捕获全部 100 个零件的完整 16 元素局部矩阵，断言 0→1→0 后序列化状态逐字节相同；全景爆炸证据 `.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model/task-16-browser-exploded.png`。Blender 渲染报告最大恢复矩阵差 `1.192e-07` 并确认精确恢复。 |
 | PASS | 自由拆解遵守移动轴、位移范围和依赖锁，不出现明显穿模。 | `tests/e2e/task13-free-disassembly.spec.ts` 与 `tests/e2e/viewer.spec.ts` 验证约束拖动、0–1000 范围、依赖锁、取消、撤销和复位；证据 `.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model/task-13-locked-dependency.png`。 |
 | PASS | 透明、隔离、剖切、灯光切换和复位功能可用。 | `tests/e2e/viewer.spec.ts` 在两浏览器验证隐藏、幽灵、隔离、可见性复位、X 剖切开关及 studio/inspection 灯光；补充证据 `task-14-ghost-isolate.png`、`task-14-cutaway.png`、`task-14-inspection-lighting.png`。 |
-| PASS | Blender 与浏览器中的材质观感一致，金属、橡胶、塑料和玻璃可明确区分。 | 原始分辨率检查上述两张 Blender 参考图、浏览器基线和最终截图；黑色橡胶手柄、哑光塑料外壳、经校准的金属卡口/骨架、玻璃/传感器和绿色 PCB 具有可分辨高光、粗糙度与色彩。受控基线以亮度阈值 RGB≥250 计算“截断像素/有效像素”，最终 Chrome `0.049914`、Edge `0.050023`，均低于 `0.06` 硬门限。 |
+| PASS | Blender 与浏览器中的材质观感一致，金属、橡胶、塑料和玻璃可明确区分。 | 原始分辨率检查上述两张 Blender 参考图、浏览器基线和最终截图；黑色橡胶手柄、哑光塑料外壳、经校准的金属卡口/骨架、蓝/绿/洋红干涉色传感器盖玻璃和绿色 PCB 具有可分辨高光、粗糙度与色彩。受控基线以 RGB≥250 计算“截断像素/有效像素”，并用四邻域连通分量阻止大面积白块；最终完整运行 Chrome 为 `0.02521835981007093` / `363 px`、Edge 为 `0.025221316761446913` / `363 px`，分别低于 `0.06` 与 `512 px` 硬门限。最大分量边界在两浏览器均为 `(576,363)–(585,480)`，不位于传感器区域。 |
 | PASS | 摄影棚光照具有自然高光、轮廓光和接触阴影；内部检查灯光能看清结构。 | `artifacts/renders/assembled-studio.png` 与 `exploded-studio.png` 已按 1600×1200 原图检查：柔和轮廓光、地面接触阴影和内部层次可读；浏览器 inspection 证据为 `.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model/task-14-inspection-lighting.png`。 |
 | PASS | Chrome 与 Edge 桌面端均可完成核心操作。 | 安装版 Chrome `152.0.7977.64` 与 Edge `151.0.4129.107`，Playwright 最终 30/30；最终独立冷启动为 Chrome 3/3、Edge 3/3，且各自使用新建 preview/browser 进程。`tests/e2e/viewer.spec.ts` 两浏览器均完成正常及 GLB 重试恢复流程，未记录意外 console/page error。恢复证据 `.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model/task-16-browser-recovered.png`。 |
 
@@ -55,29 +55,29 @@
 
 | 浏览器 | 三角形 | 解码纹理 | 初始预加载 | 全 8 模块 | 轨道旋转 FPS | 完整爆炸最低 FPS |
 |---|---:|---:|---:|---:|---:|---:|
-| Chrome 152.0.7977.64 | 223,099 | 314,572,800 B | 1,329.733 ms | 1,277.505 ms | 30.030 | 23.923 |
-| Edge 151.0.4129.107 | 223,099 | 314,572,800 B | 988.116 ms | 786.248 ms | 59.880 | 29.940 |
+| Chrome 152.0.7977.64 | 223,099 | 314,573,568 B | 1,092.761 ms | 1,211.154 ms | 30.030 | 23.923 |
+| Edge 151.0.4129.107 | 223,099 | 314,573,568 B | 953.629 ms | 1,134.866 ms | 59.880 | 23.981 |
 
 ## 交付尺寸与 SHA-256
 
 | 文件/集合 | 字节 | SHA-256 / 说明 |
 |---|---:|---|
-| `artifacts/z50ii_master.blend` | 8,669,632 | `a158e4d871fcb9fb61709cbee51013bf136c1f1021c9d66b183179671471961d` |
+| `artifacts/z50ii_master.blend` | 8,669,632 | `fe44e343befe432c67cf3cb09211e0431ebeaf097a00108a33607c4e20026e40` |
 | `dist/assembly-manifest.json` | 77,819 | `5acd185c7256f404bb817d9504843d190b13be7a9ff6326f66c81aac09faaa25` |
-| `artifacts/renders/assembled-studio.png` | 1,931,329 | `6e31af32c422aab73fdb9695eb55795c1e5379fc48c94a716e1a64b5848f21eb` |
-| `artifacts/renders/exploded-studio.png` | 1,890,548 | `0ab7d77c93bb5c21974be391302a375357b5f29cceffa7dbf4a0f8717d26e32e` |
+| `artifacts/renders/assembled-studio.png` | 1,917,124 | `11d5b69ac7e1c67fc605ac095c791edf02df2f53d1160fd0452190d5cb59a894` |
+| `artifacts/renders/exploded-studio.png` | 1,888,368 | `de65821a8f7d2ea44110a60de17d1e7965eb9c39f396f408851c1a55ab6ff235` |
 | `public/assets/environment/studio-neutral-1k.hdr` | 767,981 | `fa66fed36cd856da1bac9eed0c80d25b4030c997eb2f8624bdfabf683e7ed4ec` |
-| `artifacts/validation/performance.json` | 4,871 | `3f7e259486d14ce871a5dd187c75f6c845a1f679dfc4636ae408abdcd7c350ba` |
-| `tests/e2e/__screenshots__/z50ii-assembled-studio.png` | 165,895 | `be8b0f1ba61fea094a203742917e118f03ddbb827974130ded44010f4b2eb9ee` |
-| `dist/` | 35,946,533 | 45 files；含 8 high GLB（4,082,464 B）与 8 low GLB（4,004,392 B） |
+| `artifacts/validation/performance.json` | 4,868 | `4570630ad9f56309761617ddd94b531f43bdb0653b02c930f52a56b2ad403da4` |
+| `tests/e2e/__screenshots__/z50ii-assembled-studio.png` | 169,622 | `2538315ac70ca02ffd26eae54af00d1f51e7b7b648efd914128a93be89ca30c8` |
+| `dist/` | 35,947,665 | 45 files；含 8 high GLB（4,082,836 B）与 8 low GLB（4,004,460 B） |
 | `artifacts/textures/` | 18,250,632 | 7 files |
-| `artifacts/renders/` | 7,115,456 | 8 files |
+| `artifacts/renders/` | 7,099,071 | 8 files |
 
 ## 原始分辨率视觉检查记录
 
 - `artifacts/renders/assembled-studio.png`：1600×1200；相机外观比例清晰，金属卡口、橡胶手柄、塑料外壳、玻璃/传感器和 PCB 可区分；高光未吞没轮廓，地面接触阴影自然。
 - `artifacts/renders/exploded-studio.png`：1600×1200；主要外壳、骨架、PCB、卡口、显示/EVF 与接口层级分离且仍可追踪装配关系。
-- `tests/e2e/__screenshots__/z50ii-assembled-studio.png`：880×684 canvas 原图；黑底 studio 光照下整机轮廓、内部结构与 HUD 可读，卡口与内部金属表面纹理保留；高光门限按有效像素计算而非被黑底稀释。
+- `tests/e2e/__screenshots__/z50ii-assembled-studio.png`：880×684 canvas 原图；黑底 studio 光照下整机轮廓、内部结构与 HUD 可读，中央传感器盖玻璃保留蓝、绿、洋红表面变化，不再出现连续白色矩形；全局高光门限按有效像素计算，并由四邻域最大分量 `363 px` 守卫局部缺陷。
 - `task-16-browser-assembled.png`、`task-16-browser-exploded.png`、`task-16-browser-recovered.png`：1440×900 原图；最终爆炸图在捕获前使用当前可见包围盒重新拟合 3/4 相机，全部组件保持在视窗内；恢复图显示 8/8 模块与重试计数 1。
 
 ## 已知限制

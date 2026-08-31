@@ -112,6 +112,14 @@ sensor = parts["Z50II-03-009"]
 assert mount.location.y < front_curtain.location.y < rear_curtain.location.y < sensor.location.y
 assert rear_curtain.location.y < dust_shield.location.y < cover_glass.location.y < sensor.location.y
 assert front_curtain.dimensions.y <= 0.00035 and rear_curtain.dimensions.y <= 0.00035
+curtain_meshes = [front_curtain, *front_curtain.children_recursive, rear_curtain, *rear_curtain.children_recursive]
+assert all(
+    obj.matrix_world.translation.z - (obj.dimensions.z / 2.0) >= 0.009
+    for obj in curtain_meshes
+    if obj.type == "MESH"
+), (
+    "assembled inspection state must retract both shutter curtains outside the central sensor aperture"
+)
 assert abs(sensor.dimensions.x - 0.0235) < 0.0005
 assert abs(sensor.dimensions.z - 0.0157) < 0.0005
 assert tuple(sensor["activeAreaMm"]) == (23.5, 15.7)

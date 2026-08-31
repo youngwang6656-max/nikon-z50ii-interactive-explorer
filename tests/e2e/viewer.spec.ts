@@ -67,7 +67,13 @@ async function captureAllPartTransforms(page: Page): Promise<string> {
   return serialized!;
 }
 
-async function clippedHighlightRatio(page: Page, target: Locator): Promise<number> {
+interface HighlightMetrics {
+  clippedActiveRatio: number;
+  largestClippedComponentPixels: number;
+  largestClippedComponentBounds: { minX: number; minY: number; maxX: number; maxY: number } | null;
+}
+
+async function highlightMetrics(page: Page, target: Locator): Promise<HighlightMetrics> {
   const image = await target.screenshot({
     animations: 'disabled',
     path: `${evidenceDir}/task-16-browser-canvas.png`,
@@ -86,16 +92,62 @@ async function clippedHighlightRatio(page: Page, target: Locator): Promise<numbe
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
     let activePixels = 0;
     let clippedPixels = 0;
+    const clippedMask = new Uint8Array(canvas.width * canvas.height);
     for (let index = 0; index < pixels.length; index += 4) {
       const red = pixels[index]!;
       const green = pixels[index + 1]!;
       const blue = pixels[index + 2]!;
       if (Math.max(red, green, blue) <= 32) continue;
       activePixels += 1;
-      if (red >= 250 && green >= 250 && blue >= 250) clippedPixels += 1;
+      if (red >= 250 && green >= 250 && blue >= 250) {
+        clippedPixels += 1;
+        clippedMask[index / 4] = 1;
+      }
     }
     if (activePixels === 0) throw new Error('Visual baseline contains no active pixels.');
-    return clippedPixels / activePixels;
+    let largestClippedComponentPixels = 0;
+    let largestClippedComponentBounds: HighlightMetrics['largestClippedComponentBounds'] = null;
+    const stack: number[] = [];
+    for (let seed = 0; seed < clippedMask.length; seed += 1) {
+      if (clippedMask[seed] === 0) continue;
+      clippedMask[seed] = 0;
+      stack.push(seed);
+      let componentPixels = 0;
+      let minX = canvas.width;
+      let minY = canvas.height;
+      let maxX = 0;
+      let maxY = 0;
+      while (stack.length > 0) {
+        const pixel = stack.pop()!;
+        const x = pixel % canvas.width;
+        const y = Math.floor(pixel / canvas.width);
+        componentPixels += 1;
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x);
+        maxY = Math.max(maxY, y);
+        const neighbors = [
+          x > 0 ? pixel - 1 : -1,
+          x + 1 < canvas.width ? pixel + 1 : -1,
+          y > 0 ? pixel - canvas.width : -1,
+          y + 1 < canvas.height ? pixel + canvas.width : -1,
+        ];
+        for (const neighbor of neighbors) {
+          if (neighbor < 0 || clippedMask[neighbor] === 0) continue;
+          clippedMask[neighbor] = 0;
+          stack.push(neighbor);
+        }
+      }
+      if (componentPixels > largestClippedComponentPixels) {
+        largestClippedComponentPixels = componentPixels;
+        largestClippedComponentBounds = { minX, minY, maxX, maxY };
+      }
+    }
+    return {
+      clippedActiveRatio: clippedPixels / activePixels,
+      largestClippedComponentPixels,
+      largestClippedComponentBounds,
+    };
   }, dataUrl);
 }
 
@@ -168,9 +220,10 @@ test('final interaction workflow covers locks, free undo, visibility, cutaway, l
   await page.getByTestId('camera-preset-three-quarter').click();
   await waitForCameraSettled(page);
   const canvas = page.locator('.viewer-canvas');
-  const clippingRatio = await clippedHighlightRatio(page, canvas);
-  console.log(`[acceptance] ${testInfo.project.name} clipped highlight ratio ${clippingRatio.toFixed(6)}`);
-  expect(clippingRatio).toBeLessThanOrEqual(0.06);
+  const highlights = await highlightMetrics(page, canvas);
+  console.log(`[acceptance] ${testInfo.project.name} highlight metrics ${JSON.stringify(highlights)}`);
+  expect(highlights.clippedActiveRatio).toBeLessThanOrEqual(0.06);
+  expect(highlights.largestClippedComponentPixels).toBeLessThanOrEqual(512);
   await expect(canvas).toHaveScreenshot('z50ii-assembled-studio.png', {
     animations: 'disabled',
     maxDiffPixelRatio: 0.02,
