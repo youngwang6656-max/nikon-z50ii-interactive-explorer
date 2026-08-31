@@ -193,6 +193,8 @@ exit 0
     $expectedOrder = @(
         'blender --background --factory-startup --python blender/build_master.py',
         'blender --background artifacts/z50ii_master.blend --python blender/validate_scene.py',
+        'blender --background artifacts/z50ii_master.blend --python blender/tests/assert_internal_geometry.py',
+        'blender --background artifacts/z50ii_master.blend --python blender/tests/assert_removal_motion.py',
         'blender --background artifacts/z50ii_master.blend --python blender/render_environment.py',
         'blender --background artifacts/z50ii_master.blend --python blender/render_reference.py',
         'blender --background artifacts/z50ii_master.blend --python blender/export_modules.py',
@@ -202,11 +204,11 @@ exit 0
     Assert-Equal (Get-Content -LiteralPath $log) $expectedOrder 'One-command build order is incorrect.'
 
     Clear-Content -LiteralPath $log
-    $env:Z50II_FAIL_PATTERN = 'render_reference.py'
+    $env:Z50II_FAIL_PATTERN = 'assert_removal_motion.py'
     $failedBuildExit = Invoke-ScriptProcess -Script $buildScript -Arguments @('-ProjectRoot', $fixture)
-    if ($failedBuildExit -eq 0) { throw 'build-all.ps1 returned success after a controlled render failure.' }
+    if ($failedBuildExit -eq 0) { throw 'build-all.ps1 returned success after a controlled removal-motion failure.' }
     $stoppedOrder = Get-Content -LiteralPath $log
-    if ($stoppedOrder[-1] -notmatch 'render_reference.py' -or $stoppedOrder.Count -ne 4) {
+    if ($stoppedOrder[-1] -notmatch 'assert_removal_motion.py' -or $stoppedOrder.Count -ne 4) {
         throw "build-all.ps1 did not stop at the first nonzero command: $($stoppedOrder -join ' | ')"
     }
 

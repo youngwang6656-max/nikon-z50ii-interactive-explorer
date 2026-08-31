@@ -34,6 +34,8 @@ Push-Location $ProjectRoot
 try {
     Invoke-BuildStep 'Build Blender master scene' $blenderRunner @('--background', '--factory-startup', '--python', 'blender/build_master.py')
     Invoke-BuildStep 'Validate Blender scene' $blenderRunner @('--background', 'artifacts/z50ii_master.blend', '--python', 'blender/validate_scene.py')
+    Invoke-BuildStep 'Assert internal geometry' $blenderRunner @('--background', 'artifacts/z50ii_master.blend', '--python', 'blender/tests/assert_internal_geometry.py')
+    Invoke-BuildStep 'Assert removal motion' $blenderRunner @('--background', 'artifacts/z50ii_master.blend', '--python', 'blender/tests/assert_removal_motion.py')
     Invoke-BuildStep 'Render HDR environment' $blenderRunner @('--background', 'artifacts/z50ii_master.blend', '--python', 'blender/render_environment.py')
     Invoke-BuildStep 'Render assembled and exploded references' $blenderRunner @('--background', 'artifacts/z50ii_master.blend', '--python', 'blender/render_reference.py')
     Invoke-BuildStep 'Export GLBs and manifest' $blenderRunner @('--background', 'artifacts/z50ii_master.blend', '--python', 'blender/export_modules.py')

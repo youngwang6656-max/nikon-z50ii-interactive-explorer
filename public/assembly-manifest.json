@@ -1566,7 +1566,7 @@
         0.0,
         1.0
       ],
-      "explodeDistance": 0.022,
+      "explodeDistance": 0.01,
       "dependsOn": [
         "Z50II-04-006",
         "Z50II-04-009"

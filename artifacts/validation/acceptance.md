@@ -1,6 +1,6 @@
 # Nikon Z50II Explorer 最终验收记录
 
-验收日期：2026-08-31（Asia/Shanghai）
+验收日期：2026-09-01（Asia/Shanghai）
 验收范围：设计说明第 12 节全部自动验证与人工验收条目
 结论：**PASS（14/14）**
 
@@ -14,10 +14,10 @@
 |---|---|---|
 | PASS | 所有模块通过 glTF/GLB 结构验证。 | `blender/tests/assert_exports.py` 独立运行退出 0，报告 `16 GLBs, 8 modules, 100 aligned parts, 10 decals`；产物位于 `dist/assets/models/high/` 与 `dist/assets/models/low/`，各 8 个 GLB。 |
 | PASS | 全部 `partId` 唯一且在模型和清单之间一一对应。 | `dist/assembly-manifest.json`：schema 1、100 个零件、100 个唯一 ID；`blender/tests/assert_exports.py` 会逐一重新导入 GLB 并核对节点 extras。 |
-| PASS | 所有模块世界坐标一致，装配态无明显错位。 | `blender/tests/assert_exports.py` 报告 100 个 aligned parts；装配参考图 `renders/assembled-studio.png`（源证据 `artifacts/renders/assembled-studio.png`）和浏览器基线 `tests/e2e/__screenshots__/z50ii-assembled-studio.png` 已按原始分辨率检查。 |
+| PASS | 所有模块世界坐标一致，装配态无明显错位。 | `blender/tests/assert_exports.py` 报告 100 个 aligned parts；`blender/tests/assert_internal_geometry.py` 检查 495/496 个 Task-6 根零件对、896 个保留零件对且可选根穿插为 0；装配参考图 `renders/assembled-studio.png`（源证据 `artifacts/renders/assembled-studio.png`）和浏览器基线 `tests/e2e/__screenshots__/z50ii-assembled-studio.png` 已按原始分辨率检查。 |
 | PASS | 拆解依赖无循环，引用的零件 ID 均存在。 | `blender/validate_scene.py` 与 `blender/tests/assert_exports.py` 独立退出 0；`tests/e2e/viewer.spec.ts` 在主板依赖未满足时确认锁定、警告和零位移。 |
 | PASS | 贴图、HDR 和 GLB 路径完整；离线构建不请求外部资源。 | `dist/assets/` 包含环境、贴图、Draco 运行时及 16 个 GLB；清单使用相对路径。`scripts/package-release.ps1` 验证高/低 GLB 数量和清单结构；`scripts/start-viewer.ps1` 仅在 `127.0.0.1:4173` 提供本地 `dist/`。 |
-| PASS | 浏览器生产构建与基础交互测试通过。 | `scripts/pnpm.ps1 build` 退出 0；`scripts/pnpm.ps1 test` 为 20 files / 122 tests；`scripts/pnpm.ps1 test:e2e` 为 Chrome+Edge 30/30。完整一键流程 `scripts/build-all.ps1` 退出 0。 |
+| PASS | 浏览器生产构建与基础交互测试通过。 | `scripts/pnpm.ps1 build` 退出 0；`scripts/pnpm.ps1 test` 为 20 files / 122 tests；`scripts/pnpm.ps1 test:e2e` 为 Chrome+Edge 30/30。完整一键流程 `scripts/build-all.ps1` 退出 0，并在渲染/导出前 fail-fast 执行内部几何和拆卸运动断言。 |
 
 ## 12.2 人工验收
 
@@ -26,11 +26,11 @@
 | PASS | Z50II 外观比例、主要按键、卡口、屏幕、EVF、闪光灯和接口具有明确辨识度。 | 原始 1600×1200 检查：`artifacts/renders/assembled-studio.png`、`artifacts/renders/exploded-studio.png`；六向轮廓证据位于 `artifacts/renders/silhouette/`。可辨认手柄、Z 卡口、模式拨盘、EVF、热靴/闪光灯和侧接口。 |
 | PASS | 约 70–100 个对象可从零件树或 3D 视窗选择。 | `tests/e2e/viewer.spec.ts` 在加载 8 模块后断言 100 个稳定零件 locator；`task-16-browser-assembled.png` 显示零件树与已选螺钉。 |
 | PASS | 引导拆解可从完整装配态运行到完整爆炸态并返回。 | `tests/e2e/viewer.spec.ts` 在 Chrome 与 Edge 中捕获全部 100 个零件的完整 16 元素局部矩阵，断言 0→1→0 后序列化状态逐字节相同；全景爆炸证据 `.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model/task-16-browser-exploded.png`。Blender 渲染报告最大恢复矩阵差 `1.192e-07` 并确认精确恢复。 |
-| PASS | 自由拆解遵守移动轴、位移范围和依赖锁，不出现明显穿模。 | `tests/e2e/task13-free-disassembly.spec.ts` 与 `tests/e2e/viewer.spec.ts` 验证约束拖动、0–1000 范围、依赖锁、取消、撤销和复位；证据 `.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model/task-13-locked-dependency.png`。 |
+| PASS | 自由拆解遵守移动轴、位移范围和依赖锁，不出现明显穿模。 | `blender/tests/assert_removal_motion.py` 以不超过 0.25 mm 的采样间距验证 100 个自由根（10,420 个样本）和 18 个引导组（2,252 个样本）均无碰撞；Memory B 保持主板法向拆卸轴并以 10 mm 服务抬升避开后帘。`tests/e2e/task13-free-disassembly.spec.ts` 与 `tests/e2e/viewer.spec.ts` 另验证约束拖动、依赖锁、取消、撤销和复位。 |
 | PASS | 透明、隔离、剖切、灯光切换和复位功能可用。 | `tests/e2e/viewer.spec.ts` 在两浏览器验证隐藏、幽灵、隔离、可见性复位、X 剖切开关及 studio/inspection 灯光；补充证据 `task-14-ghost-isolate.png`、`task-14-cutaway.png`、`task-14-inspection-lighting.png`。 |
-| PASS | Blender 与浏览器中的材质观感一致，金属、橡胶、塑料和玻璃可明确区分。 | 原始分辨率检查上述两张 Blender 参考图、浏览器基线和最终截图；黑色橡胶手柄、哑光塑料外壳、经校准的金属卡口/骨架、蓝/绿/洋红干涉色传感器盖玻璃和绿色 PCB 具有可分辨高光、粗糙度与色彩。受控基线以 RGB≥250 计算“截断像素/有效像素”，并用四邻域连通分量阻止大面积白块；最终完整运行 Chrome 为 `0.02521835981007093` / `363 px`、Edge 为 `0.025221316761446913` / `363 px`，分别低于 `0.06` 与 `512 px` 硬门限。最大分量边界在两浏览器均为 `(576,363)–(585,480)`，不位于传感器区域。 |
+| PASS | Blender 与浏览器中的材质观感一致，金属、橡胶、塑料和玻璃可明确区分。 | 原始分辨率检查上述两张 Blender 参考图、浏览器基线和最终截图；黑色橡胶手柄、哑光塑料外壳、经校准的金属卡口/骨架、蓝/绿/洋红干涉色传感器盖玻璃和绿色 PCB 具有可分辨高光、粗糙度与色彩。受控基线以 RGB≥250 计算“截断像素/有效像素”，并用四邻域连通分量阻止大面积白块；最终完整运行 Chrome 为 `0.025243287606987925` / `363 px`、Edge 为 `0.025248795583219047` / `363 px`，分别低于 `0.06` 与 `512 px` 硬门限。最大分量边界在两浏览器均为 `(576,363)–(585,480)`，不位于传感器区域。 |
 | PASS | 摄影棚光照具有自然高光、轮廓光和接触阴影；内部检查灯光能看清结构。 | `artifacts/renders/assembled-studio.png` 与 `exploded-studio.png` 已按 1600×1200 原图检查：柔和轮廓光、地面接触阴影和内部层次可读；浏览器 inspection 证据为 `.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model/task-14-inspection-lighting.png`。 |
-| PASS | Chrome 与 Edge 桌面端均可完成核心操作。 | 安装版 Chrome `152.0.7977.64` 与 Edge `151.0.4129.107`，Playwright 最终 30/30；最终独立冷启动为 Chrome 3/3、Edge 3/3，且各自使用新建 preview/browser 进程。`tests/e2e/viewer.spec.ts` 两浏览器均完成正常及 GLB 重试恢复流程，未记录意外 console/page error。恢复证据 `.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model/task-16-browser-recovered.png`。 |
+| PASS | Chrome 与 Edge 桌面端均可完成核心操作。 | 安装版 Chrome `152.0.7977.64` 与 Edge `151.0.4129.107`，Playwright 最终 30/30；最终独立冷启动为 Chrome 3/3（`0.025375234521575984` / `363 px`）、Edge 3/3（`0.025366185455782155` / `363 px`），且各自使用新建 preview/browser 进程。`tests/e2e/viewer.spec.ts` 两浏览器均完成正常及 GLB 重试恢复流程，未记录意外 console/page error。恢复证据 `.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model/task-16-browser-recovered.png`。 |
 
 ## 运行时与工具版本
 
@@ -55,23 +55,23 @@
 
 | 浏览器 | 三角形 | 解码纹理 | 初始预加载 | 全 8 模块 | 轨道旋转 FPS | 完整爆炸最低 FPS |
 |---|---:|---:|---:|---:|---:|---:|
-| Chrome 152.0.7977.64 | 223,099 | 314,573,568 B | 1,092.761 ms | 1,211.154 ms | 30.030 | 23.923 |
-| Edge 151.0.4129.107 | 223,099 | 314,573,568 B | 953.629 ms | 1,134.866 ms | 59.880 | 23.981 |
+| Chrome 152.0.7977.64 | 223,099 | 314,573,568 B | 1,172.839 ms | 827.993 ms | 40.161 | 29.940 |
+| Edge 151.0.4129.107 | 223,099 | 314,573,568 B | 811.571 ms | 1,034.635 ms | 59.880 | 39.841 |
 
 ## 交付尺寸与 SHA-256
 
 | 文件/集合 | 字节 | SHA-256 / 说明 |
 |---|---:|---|
-| `artifacts/z50ii_master.blend` | 8,669,632 | `fe44e343befe432c67cf3cb09211e0431ebeaf097a00108a33607c4e20026e40` |
-| `dist/assembly-manifest.json` | 77,819 | `5acd185c7256f404bb817d9504843d190b13be7a9ff6326f66c81aac09faaa25` |
-| `artifacts/renders/assembled-studio.png` | 1,917,124 | `11d5b69ac7e1c67fc605ac095c791edf02df2f53d1160fd0452190d5cb59a894` |
-| `artifacts/renders/exploded-studio.png` | 1,888,368 | `de65821a8f7d2ea44110a60de17d1e7965eb9c39f396f408851c1a55ab6ff235` |
+| `artifacts/z50ii_master.blend` | 8,669,632 | `341ecd85d13c74c9246ae7cb3d4d45f9949f1fc56b3ae5c2f53761950f71f17c` |
+| `dist/assembly-manifest.json` | 77,818 | `7913da12c60b057eb1bd94e0fab1b9ccc69a14b7170350206b7c989cfda88198` |
+| `artifacts/renders/assembled-studio.png` | 1,917,121 | `ae91bd9d6c70fcf4a043c9450f6fefd1ed26fb04a7cd12fc6bddd990a00e6623` |
+| `artifacts/renders/exploded-studio.png` | 1,889,660 | `f8902ff925dabf1fed85dd44239e6f19f73be1de713eb7bb827ce94c1cb1d94b` |
 | `public/assets/environment/studio-neutral-1k.hdr` | 767,981 | `fa66fed36cd856da1bac9eed0c80d25b4030c997eb2f8624bdfabf683e7ed4ec` |
-| `artifacts/validation/performance.json` | 4,868 | `4570630ad9f56309761617ddd94b531f43bdb0653b02c930f52a56b2ad403da4` |
+| `artifacts/validation/performance.json` | 4,858 | `6b0221c6be93868ae0ead40053ecdbf2650f9dba97aa737b5a781e1eb0f7ed44` |
 | `tests/e2e/__screenshots__/z50ii-assembled-studio.png` | 169,622 | `2538315ac70ca02ffd26eae54af00d1f51e7b7b648efd914128a93be89ca30c8` |
-| `dist/` | 35,947,665 | 45 files；含 8 high GLB（4,082,836 B）与 8 low GLB（4,004,460 B） |
+| `dist/` | 35,947,288 | 45 files；含 8 high 与 8 low GLB |
 | `artifacts/textures/` | 18,250,632 | 7 files |
-| `artifacts/renders/` | 7,099,071 | 8 files |
+| `artifacts/renders/` | 7,100,360 | 8 files |
 
 ## 原始分辨率视觉检查记录
 
