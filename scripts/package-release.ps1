@@ -5,6 +5,26 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
 
+function Assert-NonEmptyFile {
+    param([Parameter(Mandatory = $true)][string]$Path, [string]$Label = $Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Cannot package release: missing required file $Label at $Path"
+    }
+    if ((Get-Item -LiteralPath $Path).Length -le 0) {
+        throw "Cannot package release: required file $Label is empty at $Path"
+    }
+}
+
+function Get-NonEmptyFiles {
+    param(
+        [Parameter(Mandatory = $true)][string]$Directory,
+        [string]$Filter = '*'
+    )
+    if (-not (Test-Path -LiteralPath $Directory -PathType Container)) { return @() }
+    return @(Get-ChildItem -LiteralPath $Directory -Filter $Filter -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Length -gt 0 })
+}
+
 $inputs = [ordered]@{
     'dist/index.html' = Join-Path $ProjectRoot 'dist\index.html'
     'dist/assembly-manifest.json' = Join-Path $ProjectRoot 'dist\assembly-manifest.json'
@@ -20,6 +40,12 @@ foreach ($entry in $inputs.GetEnumerator()) {
         throw "Cannot package release: missing required input $($entry.Key) at $($entry.Value)"
     }
 }
+foreach ($fileKey in @(
+    'dist/index.html', 'dist/assembly-manifest.json', 'start-viewer.ps1',
+    'z50ii_master.blend', 'README.md', 'acceptance.md'
+)) {
+    Assert-NonEmptyFile -Path $inputs[$fileKey] -Label $fileKey
+}
 
 $manifestText = [System.IO.File]::ReadAllText(
     $inputs['dist/assembly-manifest.json'],
@@ -29,12 +55,64 @@ $manifest = $manifestText | ConvertFrom-Json
 if ($manifest.schemaVersion -ne 1 -or @($manifest.modules).Count -ne 8 -or @($manifest.parts).Count -ne 100) {
     throw 'Cannot package release: dist/assembly-manifest.json must use schema 1 and contain eight modules and 100 parts.'
 }
+$moduleIds = @($manifest.modules | ForEach-Object { [string]$_.moduleId })
+$partIds = @($manifest.parts | ForEach-Object { [string]$_.partId })
+if (@($moduleIds | Where-Object { $_ } | Sort-Object -Unique).Count -ne 8) {
+    throw 'Cannot package release: manifest module IDs must be eight nonempty unique values.'
+}
+if (@($partIds | Where-Object { $_ } | Sort-Object -Unique).Count -ne 100) {
+    throw 'Cannot package release: manifest part IDs must be 100 nonempty unique values.'
+}
+$unknownPartModules = @($manifest.parts | Where-Object { $moduleIds -notcontains [string]$_.moduleId })
+if ($unknownPartModules.Count -gt 0) {
+    throw 'Cannot package release: every manifest part must reference one of the eight module IDs.'
+}
 foreach ($quality in @('high', 'low')) {
     $modelDirectory = Join-Path $ProjectRoot "dist\assets\models\$quality"
-    $glbs = @(Get-ChildItem -LiteralPath $modelDirectory -Filter '*.glb' -File -ErrorAction SilentlyContinue)
+    $glbs = Get-NonEmptyFiles -Directory $modelDirectory -Filter '*.glb'
     if ($glbs.Count -ne 8) {
         throw "Cannot package release: expected eight $quality GLBs in $modelDirectory, found $($glbs.Count)."
     }
+    $actualUrls = @($glbs | ForEach-Object { "assets/models/$quality/$($_.Name)" } | Sort-Object)
+    $manifestUrls = @($manifest.modules | ForEach-Object {
+        $url = [string]$_.urls.$quality
+        if (
+            -not $url -or $url -match '^[a-zA-Z][a-zA-Z0-9+.-]*:' -or
+            $url.StartsWith('/') -or $url.Contains('\') -or
+            @($url.Split('/')) -contains '..'
+        ) {
+            throw "Cannot package release: invalid $quality model URL '$url'."
+        }
+        $url
+    } | Sort-Object)
+    if (@($manifestUrls | Sort-Object -Unique).Count -ne 8) {
+        throw "Cannot package release: manifest $quality model URLs must be unique."
+    }
+    if (Compare-Object -ReferenceObject $actualUrls -DifferenceObject $manifestUrls) {
+        throw "Cannot package release: manifest $quality URLs do not correspond exactly to the eight packaged GLBs."
+    }
+}
+
+$distAssets = Join-Path $ProjectRoot 'dist\assets'
+foreach ($assetContract in @(
+    [pscustomobject]@{ Directory = $distAssets; Filter = 'index-*.js'; Label = 'built JavaScript' },
+    [pscustomobject]@{ Directory = $distAssets; Filter = 'index-*.css'; Label = 'built CSS' },
+    [pscustomobject]@{ Directory = (Join-Path $distAssets 'textures'); Filter = '*'; Label = 'built textures' },
+    [pscustomobject]@{ Directory = (Join-Path $ProjectRoot 'artifacts\textures'); Filter = '*'; Label = 'source textures' }
+)) {
+    if ((Get-NonEmptyFiles -Directory $assetContract.Directory -Filter $assetContract.Filter).Count -eq 0) {
+        throw "Cannot package release: no nonempty $($assetContract.Label) were found in $($assetContract.Directory)."
+    }
+}
+Assert-NonEmptyFile -Path (Join-Path $distAssets 'environment\studio-neutral-1k.hdr') -Label 'studio HDR'
+foreach ($decoder in @('draco_decoder.js', 'draco_decoder.wasm', 'draco_wasm_wrapper.js')) {
+    Assert-NonEmptyFile -Path (Join-Path $distAssets "draco\$decoder") -Label "Draco runtime $decoder"
+}
+foreach ($render in @('assembled-studio.png', 'exploded-studio.png')) {
+    Assert-NonEmptyFile -Path (Join-Path $ProjectRoot "artifacts\renders\$render") -Label "reference render $render"
+}
+foreach ($view in @('front', 'left', 'rear', 'right', 'three-quarter', 'top')) {
+    Assert-NonEmptyFile -Path (Join-Path $ProjectRoot "artifacts\renders\silhouette\$view.png") -Label "silhouette render $view"
 }
 
 $releaseRoot = [System.IO.Path]::GetFullPath((Join-Path $ProjectRoot 'release'))
@@ -63,7 +141,57 @@ if (Compare-Object -ReferenceObject $expectedTopLevel -DifferenceObject $actualT
     throw "Release staging contains unexpected delivery classes: $($actualTopLevel -join ', ')"
 }
 
-Compress-Archive -LiteralPath $staging -DestinationPath $archive -CompressionLevel Optimal
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$fixedTimestamp = [System.DateTimeOffset]::new(
+    2000, 1, 1, 0, 0, 0,
+    [System.TimeSpan]::Zero
+)
+$archiveStream = [System.IO.File]::Open(
+    $archive,
+    [System.IO.FileMode]::CreateNew,
+    [System.IO.FileAccess]::Write,
+    [System.IO.FileShare]::None
+)
+try {
+    $zip = New-Object System.IO.Compression.ZipArchive(
+        $archiveStream,
+        [System.IO.Compression.ZipArchiveMode]::Create,
+        $false
+    )
+    try {
+        $stagingPrefixLength = $staging.Length + 1
+        $relativePaths = [System.Collections.Generic.List[string]]::new()
+        Get-ChildItem -LiteralPath $staging -Recurse -File | ForEach-Object {
+            $relativePaths.Add($_.FullName.Substring($stagingPrefixLength).Replace('\', '/'))
+        }
+        $relativePaths.Sort([System.StringComparer]::Ordinal)
+        foreach ($relativePath in $relativePaths) {
+            $filePath = Join-Path $staging $relativePath.Replace('/', '\')
+            $zipEntry = $zip.CreateEntry(
+                "Z50II-Explorer/$relativePath",
+                [System.IO.Compression.CompressionLevel]::Optimal
+            )
+            $zipEntry.LastWriteTime = $fixedTimestamp
+            $zipEntry.ExternalAttributes = 0
+            $sourceStream = [System.IO.File]::OpenRead($filePath)
+            $entryStream = $zipEntry.Open()
+            try {
+                $sourceStream.CopyTo($entryStream)
+            }
+            finally {
+                $entryStream.Dispose()
+                $sourceStream.Dispose()
+            }
+        }
+    }
+    finally {
+        $zip.Dispose()
+    }
+}
+finally {
+    $archiveStream.Dispose()
+}
 $expanded = Join-Path $releaseRoot ('.archive-validation-' + [guid]::NewGuid().ToString('N'))
 try {
     Expand-Archive -LiteralPath $archive -DestinationPath $expanded

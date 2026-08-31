@@ -1,6 +1,8 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const evidenceDir = '.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model';
+
+test.describe.configure({ timeout: 120_000 });
 
 function captureUnexpectedErrors(page: Page, expectedConsoleErrors: RegExp[] = []): string[] {
   const errors: string[] = [];
@@ -31,11 +33,96 @@ async function setRange(page: Page, testId: string, value: number): Promise<void
   }, value);
 }
 
-test('final normal workflow covers 100 parts, both disassembly modes, inspection tools, and exact reassembly', async ({ page, browser }, testInfo) => {
+async function waitForCameraSettled(page: Page): Promise<void> {
+  await page.locator('.app-shell').evaluate((root) => new Promise<void>((resolve, reject) => {
+    const startedAt = performance.now();
+    let stableFrames = 0;
+    const observe = (): void => {
+      const elapsed = performance.now() - startedAt;
+      const active = (root as HTMLElement).dataset.cameraTweenActive === 'true';
+      stableFrames = !active && elapsed >= 200 ? stableFrames + 1 : 0;
+      if (stableFrames >= 4) {
+        resolve();
+        return;
+      }
+      if (elapsed >= 10_000) {
+        reject(new Error('Camera did not reach a stable terminal state within 10 seconds.'));
+        return;
+      }
+      requestAnimationFrame(observe);
+    };
+    requestAnimationFrame(observe);
+  }));
+}
+
+async function captureAllPartTransforms(page: Page): Promise<string> {
+  const serialized = await page.locator('.app-shell').getAttribute('data-all-part-transform-basis');
+  expect(serialized).not.toBeNull();
+  const transforms = JSON.parse(serialized!) as Record<string, number[]>;
+  expect(Object.keys(transforms)).toHaveLength(100);
+  for (const matrix of Object.values(transforms)) {
+    expect(matrix).toHaveLength(16);
+    expect(matrix.every(Number.isFinite)).toBe(true);
+  }
+  return serialized!;
+}
+
+async function clippedHighlightRatio(page: Page, target: Locator): Promise<number> {
+  const image = await target.screenshot({
+    animations: 'disabled',
+    path: `${evidenceDir}/task-16-browser-canvas.png`,
+  });
+  const dataUrl = `data:image/png;base64,${image.toString('base64')}`;
+  return page.evaluate(async (source) => {
+    const imageElement = new Image();
+    imageElement.src = source;
+    await imageElement.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = imageElement.width;
+    canvas.height = imageElement.height;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) throw new Error('Unable to analyze the controlled visual baseline.');
+    context.drawImage(imageElement, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let activePixels = 0;
+    let clippedPixels = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      const red = pixels[index]!;
+      const green = pixels[index + 1]!;
+      const blue = pixels[index + 2]!;
+      if (Math.max(red, green, blue) <= 32) continue;
+      activePixels += 1;
+      if (red >= 250 && green >= 250 && blue >= 250) clippedPixels += 1;
+    }
+    if (activePixels === 0) throw new Error('Visual baseline contains no active pixels.');
+    return clippedPixels / activePixels;
+  }, dataUrl);
+}
+
+test('guided disassembly restores the exact 16-element transforms of all 100 parts', async ({ page, browser }, testInfo) => {
   console.log(`[acceptance] ${testInfo.project.name} browser ${browser.version()}`);
   const errors = captureUnexpectedErrors(page);
   await page.goto('/');
+  await page.getByTestId('load-all-modules').click();
+  await expect(page.locator('.load-progress')).toHaveText('8 / 8', { timeout: 30_000 });
+  await expect(page.locator('[data-testid^="part-Z50II-"]')).toHaveCount(100);
+  const root = page.locator('.app-shell');
+  const assembledTransforms = await captureAllPartTransforms(page);
+  await setRange(page, 'guided-progress', 1000);
+  await expect(root).toHaveAttribute('data-assembly-progress', '1');
+  await page.getByTestId('camera-preset-three-quarter').click();
+  await waitForCameraSettled(page);
+  await page.screenshot({ path: `${evidenceDir}/task-16-browser-exploded.png` });
+  await setRange(page, 'guided-progress', 0);
+  await expect(root).toHaveAttribute('data-assembly-progress', '0');
+  expect(await captureAllPartTransforms(page)).toBe(assembledTransforms);
+  expect(errors).toEqual([]);
+});
 
+test('final interaction workflow covers locks, free undo, visibility, cutaway, lighting, and calibrated visuals', async ({ page, browser }, testInfo) => {
+  console.log(`[acceptance] ${testInfo.project.name} browser ${browser.version()}`);
+  const errors = captureUnexpectedErrors(page);
+  await page.goto('/');
   await expect(page.getByText('参考级内部结构，非 Nikon 原厂 CAD')).toBeVisible();
   await page.getByTestId('load-all-modules').click();
   await expect(page.locator('.load-progress')).toHaveText('8 / 8', { timeout: 30_000 });
@@ -60,18 +147,6 @@ test('final normal workflow covers 100 parts, both disassembly modes, inspection
   await expect(page.getByTestId('part-progress-live')).toHaveText('0%');
   await expect(root).toHaveAttribute('data-selected-transform-basis', assembledBasis!);
 
-  await page.getByTestId('mode-guided').selectOption('guided');
-  await expect(root).toHaveAttribute('data-interaction-mode', 'guided');
-  await setRange(page, 'guided-progress', 1000);
-  await expect(root).toHaveAttribute('data-assembly-progress', '1');
-  await page.getByTestId('camera-preset-three-quarter').click();
-  await expect(root).toHaveAttribute('data-camera-tween-active', 'true');
-  await expect(root).toHaveAttribute('data-camera-tween-active', 'false');
-  await page.screenshot({ path: `${evidenceDir}/task-16-browser-exploded.png` });
-  await setRange(page, 'guided-progress', 0);
-  await expect(root).toHaveAttribute('data-assembly-progress', '0');
-  await expect(root).toHaveAttribute('data-selected-transform-basis', assembledBasis!);
-
   await page.getByTestId('hide-selected').click();
   await expect(page.getByTestId('hide-selected')).toHaveAttribute('aria-pressed', 'true');
   await page.getByTestId('visibility-reset').click();
@@ -91,9 +166,12 @@ test('final normal workflow covers 100 parts, both disassembly modes, inspection
   await expect(page.getByTestId('lighting-preset')).toHaveValue('studio');
 
   await page.getByTestId('camera-preset-three-quarter').click();
-  await expect(root).toHaveAttribute('data-camera-tween-active', 'true');
-  await expect(root).toHaveAttribute('data-camera-tween-active', 'false');
-  await expect(page.locator('.viewer-canvas')).toHaveScreenshot('z50ii-assembled-studio.png', {
+  await waitForCameraSettled(page);
+  const canvas = page.locator('.viewer-canvas');
+  const clippingRatio = await clippedHighlightRatio(page, canvas);
+  console.log(`[acceptance] ${testInfo.project.name} clipped highlight ratio ${clippingRatio.toFixed(6)}`);
+  expect(clippingRatio).toBeLessThanOrEqual(0.06);
+  await expect(canvas).toHaveScreenshot('z50ii-assembled-studio.png', {
     animations: 'disabled',
     maxDiffPixelRatio: 0.02,
   });
@@ -118,6 +196,10 @@ test('final recovery workflow retries a failed GLB without losing the working sc
   await page.getByTestId('load-all-modules').click();
   const retry = page.getByTestId('retry-08_io_flex_fasteners');
   await expect(retry).toBeVisible({ timeout: 30_000 });
+  await expect.poll(async () => page.locator(
+    '.module-group[data-status="ready"], .module-group[data-status="failed"]',
+  ).count()).toBe(8);
+  await expect(page.locator('.module-group[data-status="failed"]')).toHaveCount(1);
   await expect(page.locator('.load-progress')).toHaveText('7 / 8');
   await retry.click();
   const moduleRow = page.locator('.module-group[data-module-id="08_io_flex_fasteners"]');

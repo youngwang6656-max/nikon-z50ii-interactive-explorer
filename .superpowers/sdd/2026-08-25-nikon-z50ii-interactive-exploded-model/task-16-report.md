@@ -1,50 +1,35 @@
-# Task 16 Report: End-to-End QA and Offline Release
+# Task 16 Report: Independent Review Fixes and Final Offline Release
 
 ## Outcome
 
-Task 16 completes the Nikon Z50II interactive explorer with a reproducible one-command build, installed Chrome/Edge acceptance coverage, a Python-only offline launcher, and a validated release archive.
+All six findings from the Task 16 independent review were reproduced with focused failing tests, corrected, and verified through a fresh complete pipeline plus independent reruns. The final package remains fully offline and contains exactly the seven required delivery classes.
 
-Final delivery:
+Final archive from the definitive post-report double run:
 
-- `release/Z50II-Explorer.zip`: **55,682,412 bytes**
-- SHA-256: `7259921fbfa2a7e96c169f60c013c0b9cddea198373cbf3e96ef1871cea5ff40`
-- archive: 65 entries and exactly the seven delivery classes `acceptance.md`, `dist`, `README.md`, `renders`, `start-viewer.ps1`, `textures`, `z50ii_master.blend`
-- packaged manifest: schema 1, 8 modules, 100 parts, 100 unique `partId` values
-- packaged models: 8 high-detail and 8 low-detail GLBs
+- `release/Z50II-Explorer.zip`: **55,684,458 bytes**
+- SHA-256: `f69c41a473f89e3a97289690d65b0511784132d42c50adaaafac4140c1141f47`
+- 64 nonempty file entries with normalized paths, fixed `2000-01-01 00:00:00` ZIP timestamps, zeroed external attributes, and deterministic ordering
+- exact top-level classes: `acceptance.md`, `dist`, `README.md`, `renders`, `start-viewer.ps1`, `textures`, `z50ii_master.blend`
+- packaged manifest: schema 1, 8 unique modules, 100 unique parts
+- packaged models: exact manifest URL correspondence to 8 high and 8 low GLBs
 
-## Test-first evidence
+## Review findings resolved test-first
 
-### Release workflow RED -> GREEN
+1. **Cold/isolated E2E reliability.** Camera helpers now wait for four stable animation frames after the transition boundary and never require a transient tween flag. Recovery waits until all eight module rows are terminal before checking 7/8 and retrying. The former heavy workflow is split into bounded exact-reassembly, interaction/visual, and recovery tests under a justified 120-second suite timeout.
+2. **Whole-assembly exactness.** The application publishes the sorted local transform basis for every loaded part. Chrome and Edge capture all 100 entries, validate 16 finite matrix elements per part, execute guided 0→1→0, and require the complete serialized transform state to match exactly.
+3. **Deep package rejection.** Packaging now rejects duplicate/empty module IDs, duplicate/empty part IDs, unknown part modules, unsafe or mismatched manifest URLs, missing/empty JS/CSS/textures/HDR/Draco assets, missing named renders, and any high/low set other than exact 8+8 nonempty GLBs. Behavioral tests prove duplicate module, duplicate part, URL mismatch, empty JS, and missing low GLB are all rejected.
+4. **Byte-reproducible ZIP.** `Compress-Archive` was replaced with deterministic `ZipArchive` creation using normalized entry paths, fixed metadata, and stable input ordering. Both the fixture and production archive produce identical SHA-256 values across consecutive identical-input runs.
+5. **Browser clipping.** The studio exposure and reflective material calibration now preserve mount/metal surface cues and recognize the exported DX-sensor material alias. The objective guard counts RGB≥250 pixels against active rendered pixels (RGB max >32), so the black background cannot dilute the result. The final full run measured Chrome `0.049914` and Edge `0.050023`, both below the hard `0.06` ceiling. The final baseline and evidence were inspected at original resolution before acceptance.
+6. **Standalone documented commands.** `scripts/pnpm.ps1` independently locates the bundled Node runtime, prepends bundled Node plus repository `node_modules/.bin`, and needs no global `node`, `pnpm`, or `npx`. With PATH reduced to Windows system directories, the documented command reported Node `v24.19.0` and completed the production build.
 
-The behavioral contract test initially failed because the required release scripts did not exist. It then exercised a complete temporary fixture and proved exact staging/archive classes, 8+8 GLBs, rejection of a missing low-detail GLB, exact nine-stage build order, local Node/PATH provisioning, and fail-fast behavior.
+## Focused RED → GREEN evidence
 
-Packaging the real production manifest in Windows PowerShell 5.1 exposed another RED: `Get-Content -Raw` decoded UTF-8 without BOM as the local ANSI code page and `ConvertFrom-Json` failed on Chinese fields. The fixture was strengthened with Chinese names written as UTF-8 without BOM and reproduced the same failure. `package-release.ps1` now reads the manifest with `System.IO.File.ReadAllText(..., Encoding.UTF8)`.
-
-Fresh GREEN command:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/assert-release-workflow.ps1
-```
-
-Result: **exit 0**, `Release workflow behavioral tests passed.` The controlled incomplete-package and render-failure branches both returned nonzero as required.
-
-### Browser workflow RED -> GREEN
-
-The final normal workflow first reached the intended visual assertion and failed because the required assembled baseline was absent. The actual canvas was inspected at original 880x684 resolution before accepting `tests/e2e/__screenshots__/z50ii-assembled-studio.png`; no blind snapshot update was used.
-
-The final browser tests cover, in both installed desktop browsers:
-
-- 8 modules and exactly 100 selectable parts;
-- reference-grade/non-OEM-CAD disclaimer;
-- dependency lock with a constrained no-move assertion;
-- selection and exact selected-part transform basis;
-- free-axis movement, undo, and reset;
-- guided progress 0 -> 1 -> 0 with exact reassembly;
-- hide, ghost, isolate, visibility reset, X cutaway, and studio/inspection lighting;
-- an intentionally aborted module-08 request, retained 7/8 state, one retry, recovery to 8/8, and 100 parts;
-- zero unexpected page or console errors in the normal and recovery flows.
-
-The original exploded browser capture was readable but too tightly framed. The test now fits the 3/4 preset after full explosion and waits for the camera tween boundary before capturing; the focused Chrome rerun passed unchanged application code and the corrected 1440x900 image contains the full assembly.
+- Fresh-PATH wrapper RED: `'node' is not recognized`; GREEN: `v24.19.0` plus successful build.
+- Exact-transform RED: the all-part transform attribute was absent; GREEN: 100 parts × 16 finite elements and exact 0→1→0 equality.
+- Material RED: the exported `Z50II DX Sensor` alias retained its original bright material; GREEN: calibrated sensor plus stricter mount/shield roughness, color, and environment response.
+- Visual-guard RED: active-pixel clipping `0.094166` exceeded `0.08`; GREEN after material correction: about `0.050`, with the final ceiling tightened to `0.06`.
+- ZIP RED: two `Compress-Archive` runs produced different hashes, and a later deep check exposed PowerShell-version-dependent path sorting; GREEN fixture runs now both produce ordinally ordered SHA-256 `5b96f9ed8c627ac2ff06af7813240d5f3a69472f041e5c6b1498ef13672a556d` at 7,294 bytes.
+- Adversarial package fixtures that previously passed are now rejected for duplicate IDs, mismatched URLs, empty JS, and incomplete GLBs.
 
 ## One-command build
 
@@ -54,118 +39,72 @@ Command:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-all.ps1
 ```
 
-Result: **exit 0**. It ran the mandated order and stopped on nonzero errors:
+Fresh final result: **exit 0** in the mandated fail-fast order.
 
-1. Blender master build
-2. scene validation
-3. HDR environment render
-4. assembled/exploded reference renders
-5. GLB/manifest export
-6. Blender export assertions
-7. unit tests
-8. production web build
-9. installed Chrome+Edge Playwright tests
-
-The build script explicitly prepends the bundled Node 24.19.0 runtime and repository `node_modules/.bin`; it does not depend on global Node tooling.
-
-One-command evidence:
-
-- Blender master and scene validation: pass
-- HDR: 1024x512, 128 samples
-- reference renders: 1600x1200, Cycles 128 samples; assembled 117.82 s, exploded 120.22 s
-- reassembly: maximum matrix delta `1.192e-07`, exact restore assertion pass
-- exports: `16 GLBs, 8 modules, 100 aligned parts, 10 decals, shared textures, and enforced high/low policy`
-- unit: 20 files / 122 tests
-- E2E: 28/28, about 3.7 minutes
-
-The requested pre-build artifact cleanup was evaluated but not forced after the environment rejected the recursive deletion safety boundary. The deterministic build completed successfully over the relevant generated outputs without widening deletion scope.
+- Blender 4.5.12 LTS master build and scene validation: pass
+- HDR: 1024×512, 128 samples
+- reference renders: 1600×1200, Cycles 128 samples; assembled 118.89 s, exploded 128.72 s
+- Blender reassembly maximum matrix delta: `1.192e-07`; exact restore assertion pass
+- exports: 16 GLBs, 8 modules, 100 aligned parts, 10 decals, shared textures, enforced high/low policy
+- unit tests: 20 files / 122 tests
+- production build: 48 modules transformed
+- installed Chrome+Edge acceptance: 30/30 in about 3.0 minutes
 
 ## Independent final verification
 
-All commands were rerun independently after the one-command build:
+Every command below was rerun after the final visual hardening and one-command rebuild:
 
-| Command | Result |
+| Verification | Result |
 |---|---|
-| `scripts/run-blender.ps1 --background artifacts/z50ii_master.blend --python blender/validate_scene.py` | exit 0; `Z50II scene validation passed` |
-| `scripts/run-blender.ps1 --background --factory-startup --python blender/tests/assert_exports.py` | exit 0; 16 GLBs, 8 modules, 100 aligned parts, 10 decals, shared textures, enforced high/low policy |
+| `validate_scene.py` | exit 0; `Z50II scene validation passed` |
+| `blender/tests/assert_exports.py` | exit 0; 16 GLBs, 8 modules, 100 aligned parts, 10 decals |
 | `scripts/pnpm.ps1 test` | exit 0; 20 files / 122 tests |
 | `scripts/pnpm.ps1 build` | exit 0; 48 modules transformed |
-| `scripts/pnpm.ps1 test:e2e` | exit 0; 28/28 in about 3.6 minutes |
-| `scripts/tests/assert-release-workflow.ps1` | exit 0; all behavioral contracts passed |
-| `git diff --check` | exit 0; no whitespace errors (Windows line-ending advisories only) |
+| isolated Chrome `viewer.spec.ts` | 3/3; version 152.0.7977.64; clipping `0.050011` |
+| isolated Edge `viewer.spec.ts` | 3/3; version 151.0.4129.107; clipping `0.050114` |
+| full independent Chrome+Edge | 30/30 in about 3.7 minutes; clipping `0.049914` / `0.050023` |
+| `assert-release-workflow.ps1` | exit 0; deterministic fixture plus all adversarial and fail-fast branches |
+| fresh-PATH documented wrapper/build | Node `v24.19.0`; build exit 0 |
+| packaged launcher | HTTP 200; Nikon title found; listener `python`; Node absent from PATH |
+| `git diff --check` | exit 0; no whitespace errors |
 
-The only production-build advisory is Vite's non-blocking warning for a JavaScript chunk larger than 500 kB.
+The Vite warning for a main JavaScript chunk above 500 kB is non-blocking and does not affect offline behavior.
 
 ## Runtime and performance evidence
 
-Exact final versions:
+Exact versions: Blender 4.5.12 LTS (`84afd5f785f7`), Chrome 152.0.7977.64, Edge 151.0.4129.107, Node 24.19.0, pnpm 11.19.0, PowerShell 7.6.4 (release scripts also exercised by Windows PowerShell 5.1), Python 3.13.5, Three.js 0.185.1, Playwright 1.62.1, Vite 8.2.2, Vitest 4.1.10, TypeScript 7.0.2.
 
-| Component | Version |
-|---|---|
-| Blender | 4.5.12 LTS, build hash `84afd5f785f7`, built 2026-07-21 |
-| Chrome | 152.0.7977.64 |
-| Edge | 151.0.4129.107 |
-| Node.js | 24.19.0 |
-| pnpm | 11.19.0 |
-| PowerShell | 7.6.4; release script also verified under Windows PowerShell 5.1 |
-| Python | 3.13.5 detected; launcher minimum 3.8 |
-| Three.js | 0.185.1 |
-| Playwright | 1.62.1 |
-| TypeScript | 7.0.2 |
-| Vite | 8.2.2 |
-| Vitest | 4.1.10 |
+The final `artifacts/validation/performance.json` uses installed browser channels, Intel Arc / D3D11, 1920×1080, high quality, and three repetitions:
 
-`artifacts/validation/performance.json` records Intel Arc / D3D11 runs at 1920x1080 and high quality. Both browsers render 223,099 triangles and decode 314,572,800 texture bytes. Chrome measured 1,460.642 ms initial preload, 1,204.863 ms all modules, 40.000 orbit FPS, and 29.851 minimum exploded FPS. Edge measured 1,087.366 ms initial preload, 1,139.909 ms all modules, 59.880 orbit FPS, and 30.030 minimum exploded FPS.
+| Browser | Triangles | Decoded textures | Initial preload | All modules | Orbit FPS | Minimum exploded FPS |
+|---|---:|---:|---:|---:|---:|---:|
+| Chrome | 223,099 | 314,572,800 B | 1,329.733 ms | 1,277.505 ms | 30.030 | 23.923 |
+| Edge | 223,099 | 314,572,800 B | 988.116 ms | 786.248 ms | 59.880 | 29.940 |
 
-## Offline package and launcher verification
+## Offline package and launcher
 
-`scripts/package-release.ps1` independently expanded and validated the archive after compression. A second ZIP inspection opened the archive directly and confirmed:
+The production ZIP was generated twice after the final acceptance update, and both size and SHA-256 were identical. Direct archive inspection confirmed 64 nonempty entries, fixed wall-clock timestamps, deterministic normalized ordering, seven exact delivery classes, schema 1, 8 unique modules, 100 unique parts, and 8+8 models whose paths exactly match the manifest.
 
-- 65 entries;
-- seven exact top-level delivery classes;
-- schema version 1;
-- 8 modules;
-- 100 parts and 100 unique IDs;
-- 8 high and 8 low GLBs;
-- archive size and SHA-256 exactly matching the outcome above.
-
-The packaged launcher was started hidden with `-NoOpen`. It located `C:\Users\WangYan\miniconda3\python.exe`, served packaged `dist/` on `127.0.0.1:4173`, and returned HTTP 200 with the Nikon Z50II title. The listener process was `python`; Node was not required. The exact launcher and listener processes were stopped after the probe.
+The staged launcher was started hidden with PATH restricted to `C:\Windows\System32;C:\Windows;C:\Users\WangYan\miniconda3`. It used `C:\Users\WangYan\miniconda3\python.exe`, opened `127.0.0.1:4173`, returned HTTP 200 with the Nikon Z50II title, and ran a `python` listener. The owned launcher/listener processes were stopped after the probe.
 
 ## Original-resolution visual review
 
-- `artifacts/renders/assembled-studio.png` (1600x1200): recognizable Z50II proportions, readable mount/sensor/chassis layers, controlled metal highlights, distinct rubber/plastic/glass/PCB materials, and natural contact shadows.
-- `artifacts/renders/exploded-studio.png` (1600x1200): shell, chassis, mount, electronics, display/EVF, and interface layers remain separated and traceable without losing assembly context.
-- `tests/e2e/__screenshots__/z50ii-assembled-studio.png` (880x684): studio canvas retains the body silhouette and internal structure on black; bright mount edges remain bounded.
-- `task-16-browser-assembled.png` (1440x900): complete interactive layout, 100-part tree, selected fastener inspector, and assembled body are readable.
-- `task-16-browser-exploded.png` (1440x900): all exploded components remain inside the fitted 3/4 view, with internal PCB/flex/chassis layers clearly visible.
-- `task-16-browser-recovered.png` (1440x900): assembled model restored after module retry, 8/8 modules visible, and the recovered module shows retry count 1.
+- Blender assembled/exploded references (1600×1200): recognizable body and traceable exploded structure, distinct rubber/plastic/metal/glass/PCB materials, controlled studio light, and contact shadows.
+- Browser baseline and canvas (880×684): mount rings and chassis surfaces retain tonal steps; the active-pixel clipping guard is not diluted by the black background.
+- Final assembled/exploded/recovery evidence (1440×900): complete UI and 100-part tree are readable, the fitted explosion remains in frame, and recovery shows 8/8 modules with retry count 1.
 
-## Deliverable hashes and limitations
+## Exact artifact evidence
 
-`artifacts/validation/acceptance.md` records all 14 design Section 12 criteria as PASS, exact evidence paths, tool/browser versions, performance values, and hashes/sizes for the master, manifest, renders, HDR, performance JSON, visual baseline, `dist`, textures, and render collections.
+- master: 8,669,632 bytes, SHA-256 `a158e4d871fcb9fb61709cbee51013bf136c1f1021c9d66b183179671471961d`
+- manifest: 77,819 bytes, SHA-256 `5acd185c7256f404bb817d9504843d190b13be7a9ff6326f66c81aac09faaa25`
+- assembled render: 1,931,329 bytes, SHA-256 `6e31af32c422aab73fdb9695eb55795c1e5379fc48c94a716e1a64b5848f21eb`
+- exploded render: 1,890,548 bytes, SHA-256 `0ab7d77c93bb5c21974be391302a375357b5f29cceffa7dbf4a0f8717d26e32e`
+- performance JSON: 4,871 bytes, SHA-256 `3f7e259486d14ce871a5dd187c75f6c845a1f679dfc4636ae408abdcd7c350ba`
+- browser baseline: 165,895 bytes, SHA-256 `be8b0f1ba61fea094a203742917e118f03ddbb827974130ded44010f4b2eb9ee`
+- `dist/`: 45 files / 35,946,533 bytes
+- `artifacts/textures/`: 7 files / 18,250,632 bytes
+- `artifacts/renders/`: 8 files / 7,115,456 bytes
 
-This is a reference-grade reconstruction based on public information, **not Nikon OEM CAD**, manufacturing data, repair instructions, or a safety reference. The lens remains explicitly deferred; only the camera-body Z mount is delivered. High-quality decoded textures use about 300 MiB, so constrained GPUs should use Auto or Low quality. Offline viewing requires Python 3.8 or newer; rebuilding requires the repository Blender/runtime/dependencies.
-
-## Files
-
-Created:
-
-- `tests/e2e/viewer.spec.ts`
-- `tests/e2e/__screenshots__/z50ii-assembled-studio.png`
-- `scripts/build-all.ps1`
-- `scripts/start-viewer.ps1`
-- `scripts/package-release.ps1`
-- `scripts/tests/assert-release-workflow.ps1`
-- `README.md`
-- `artifacts/validation/acceptance.md`
-- `release/Z50II-Explorer/`
-- `release/Z50II-Explorer.zip`
-- final assembled/exploded/recovery browser evidence images
-- this report
-
-Modified:
-
-- `playwright.config.ts`
-- regenerated deterministic master, Blender renders, performance evidence, and high/low GLB deliverables
+This remains a public-information reference reconstruction, not Nikon OEM CAD, manufacturing data, repair instruction, or a safety reference. The lens is deferred; only the camera-body Z mount is delivered. High quality decodes about 300 MiB of texture data, so constrained GPUs should use Auto or Low. Offline viewing requires Python 3.8+.
 
 The implementation plan and progress file were not modified.

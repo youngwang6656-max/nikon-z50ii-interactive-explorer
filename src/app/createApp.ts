@@ -212,6 +212,24 @@ export async function createApp(
     }
   };
 
+  const publishAllPartTransformBasis = (): void => {
+    if (!viewer.partIndex) {
+      delete shell.root.dataset.allPartTransformBasis;
+      return;
+    }
+    const transforms = Object.fromEntries(
+      [...viewer.partIndex.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([partId, object]) => {
+          if (object.matrixAutoUpdate) object.updateMatrix();
+          return [partId, object.matrix.elements
+            .slice(0, 16)
+            .map((value) => Number(value.toPrecision(15)))];
+        }),
+    );
+    shell.root.dataset.allPartTransformBasis = JSON.stringify(transforms);
+  };
+
   const attachLoadedModule = (loaded: LoadedModule): void => {
     if (mountedQualities.get(loaded.moduleId) === loaded.quality) return;
     const displaySnapshot = displayController?.snapshot();
@@ -226,6 +244,7 @@ export async function createApp(
       cutawayController?.refresh();
       lightingController?.refresh();
       if (viewer.partIndex) guidedTransforms.apply(assemblyState, viewer.partIndex);
+      publishAllPartTransformBasis();
       selectionController?.select(selectedPartId);
       updateSelectionUi(selectedPartId);
       axisDragController?.refreshHandle();
@@ -386,6 +405,7 @@ export async function createApp(
     shell.root.dataset.freeDragEnabled = String(interactionMode === 'free');
     shell.root.dataset.cameraTweenActive = String(cameraTween?.active ?? false);
     guidedTransforms.apply(assemblyState, viewer.partIndex ?? new Map());
+    publishAllPartTransformBasis();
     inspector?.updateAssemblyState(assemblyState);
     timeline?.render(snapshot, globalProgress);
     axisDragController?.refreshHandle();
@@ -405,6 +425,7 @@ export async function createApp(
     shell.root.dataset.freeDragEnabled = String(interactionMode === 'free');
     shell.root.dataset.cameraTweenActive = String(cameraTween?.active ?? false);
     guidedTransforms.apply(assemblyState, viewer.partIndex ?? new Map());
+    publishAllPartTransformBasis();
     inspector?.updateAssemblyState(assemblyState);
     timeline?.render(snapshot, publishedProgress);
     axisDragController?.refreshHandle();

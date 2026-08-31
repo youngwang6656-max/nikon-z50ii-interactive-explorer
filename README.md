@@ -42,6 +42,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1
 
 第一条命令依次重建 Blender 主场景、验证场景、渲染 HDR 和参考图、导出高/低 GLB 与清单、执行 Blender 导出断言、单元测试、生产构建，以及安装版 Chrome/Edge 的 Playwright 验收。任一步骤失败都会立即停止。第二条命令验证所有输入并生成 `release/Z50II-Explorer/` 与 `release/Z50II-Explorer.zip`。
 
+`scripts/pnpm.ps1` 是可独立运行的仓库入口：它会自行定位 Codex 捆绑 Node，并将 Node 目录与仓库 `node_modules/.bin` 前置到子进程 `PATH`。因此下面的单项命令不依赖全局 `node`/`pnpm`/`npx`；可用 `./scripts/pnpm.ps1 exec node --version` 直接验证捆绑运行时。
+
 需要单独运行时，可使用：
 
 ```powershell

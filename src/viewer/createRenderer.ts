@@ -136,8 +136,21 @@ export function calibrateInspectionMaterials(root: Object3D): void {
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) {
       if (!(material instanceof MeshStandardMaterial) || calibrated.has(material)) continue;
-      if (material.userData.materialRole !== 'sensor_glass' && material.name !== 'sensor_glass') continue;
+      const exportedRole = typeof material.userData.materialRole === 'string'
+        ? material.userData.materialRole
+        : material.name;
+      const role = exportedRole.toLowerCase().includes('dx sensor')
+        ? 'sensor_glass'
+        : exportedRole;
+      if (!['sensor_glass', 'mount_metal', 'brushed_shield'].includes(role)) continue;
       calibrated.add(material);
+      if (role !== 'sensor_glass') {
+        material.color.multiplyScalar(0.25);
+        material.roughness = Math.max(material.roughness, 0.8);
+        material.envMapIntensity = Math.min(material.envMapIntensity, 0.08);
+        material.needsUpdate = true;
+        continue;
+      }
       material.color.setHex(0x082c36);
       material.metalness = 0;
       material.roughness = Math.max(material.roughness, 0.7);
@@ -206,7 +219,7 @@ export function createViewer(container: HTMLElement): Viewer {
   }
   renderer.outputColorSpace = SRGBColorSpace;
   renderer.toneMapping = ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.65;
+  renderer.toneMappingExposure = 0.25;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = PCFSoftShadowMap;
   renderer.domElement.setAttribute('aria-label', 'Nikon Z50II 三维结构视图');

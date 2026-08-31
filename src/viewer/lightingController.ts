@@ -119,7 +119,9 @@ export class LightingController {
 
   private applyPreset(): void {
     const inspection = this.currentPreset === 'inspection';
-    this.renderer.toneMappingExposure = inspection ? 1.15 : 1;
+    this.renderer.toneMappingExposure = inspection
+      ? Math.min(0.8, this.originalExposure * 1.2)
+      : this.originalExposure;
     this.scene.environmentIntensity = (inspection ? 0.12 : 0.22)
       * this.qualityEnvironmentIntensity;
     this.ambient.intensity = inspection ? 0.42 : 0.12;

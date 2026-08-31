@@ -34,7 +34,7 @@ describe('LightingController', () => {
     const controller = new LightingController(renderer, scene, visibility);
 
     expect(controller.preset).toBe('studio');
-    expect(renderer.toneMappingExposure).toBe(1);
+    expect(renderer.toneMappingExposure).toBe(0.65);
     const studioEnvironmentIntensity = scene.environmentIntensity;
     expect(legacy.visible).toBe(false);
     expect(scene.getObjectByName('Z50II_STUDIO_KEY')).not.toBeNull();
@@ -46,7 +46,8 @@ describe('LightingController', () => {
     controller.setPreset('inspection');
 
     expect(controller.preset).toBe('inspection');
-    expect(renderer.toneMappingExposure).toBe(1.15);
+    expect(renderer.toneMappingExposure).toBeLessThanOrEqual(0.8);
+    expect(renderer.toneMappingExposure).toBeGreaterThan(0.65);
     expect(scene.environmentIntensity).toBeLessThan(studioEnvironmentIntensity);
     expect(floorMaterial.opacity).toBe(0.16);
     expect(first.material).not.toBe(shared);
@@ -56,7 +57,7 @@ describe('LightingController', () => {
 
     controller.setPreset('studio');
 
-    expect(renderer.toneMappingExposure).toBe(1);
+    expect(renderer.toneMappingExposure).toBe(0.65);
     expect(floorMaterial.opacity).toBe(0.47);
     expect(first.material).toBe(shared);
     expect(second.material).toBe(shared);
