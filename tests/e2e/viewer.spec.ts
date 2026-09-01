@@ -1,6 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-
-const evidenceDir = '.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model';
+import { evidenceDir } from './evidence-paths';
 
 test.describe.configure({ timeout: 120_000 });
 

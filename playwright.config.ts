@@ -7,6 +7,7 @@ const executablePath = environment?.PLAYWRIGHT_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: './tests/e2e',
+  outputDir: 'runtime-results/playwright',
   snapshotPathTemplate: 'tests/e2e/__screenshots__/{arg}{ext}',
   timeout: 60_000,
   fullyParallel: false,

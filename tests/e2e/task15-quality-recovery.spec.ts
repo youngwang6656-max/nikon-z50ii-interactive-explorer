@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
-
-const evidenceDir = '.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model';
+import { evidenceDir } from './evidence-paths';
 
 test('switches high and low transactionally without losing interaction state', async ({ page }) => {
   const errors: string[] = [];

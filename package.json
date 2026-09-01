@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node scripts/run-e2e.mjs",
+    "evidence:refresh": "node scripts/refresh-evidence.mjs",
     "check": "vitest run && tsc --noEmit && vite build"
   },
   "dependencies": {

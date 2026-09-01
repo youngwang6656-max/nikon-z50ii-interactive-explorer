@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
-
-const evidenceDir = '.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model';
+import { evidenceDir } from './evidence-paths';
 
 test('selection, search, display commands, pointer gestures, and responsive inspector', async ({ page }) => {
   const errors: string[] = [];

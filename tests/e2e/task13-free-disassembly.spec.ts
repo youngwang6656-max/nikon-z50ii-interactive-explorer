@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
-
-const evidenceDir = '.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model';
+import { evidenceDir } from './evidence-paths';
 
 async function selectPart(page: import('@playwright/test').Page, partId: string): Promise<void> {
   const search = page.getByLabel('搜索相机部件');

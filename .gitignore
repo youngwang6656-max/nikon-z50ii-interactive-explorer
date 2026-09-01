@@ -9,4 +9,5 @@ references/vendor/
 *.blend2
 test-results/
 playwright-report/
+runtime-results/
 release/Z50II-Explorer/

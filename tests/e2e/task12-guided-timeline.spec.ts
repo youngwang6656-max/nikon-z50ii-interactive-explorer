@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
-
-const evidenceDir = '.superpowers/sdd/2026-08-25-nikon-z50ii-interactive-exploded-model';
+import { evidenceDir } from './evidence-paths';
 
 async function setRange(page: import('@playwright/test').Page, testId: string, value: number): Promise<void> {
   await page.getByTestId(testId).evaluate((element, nextValue) => {

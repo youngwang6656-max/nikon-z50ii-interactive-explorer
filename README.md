@@ -42,6 +42,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1
 
 第一条命令依次重建 Blender 主场景、验证场景、渲染 HDR 和参考图、导出高/低 GLB 与清单、执行 Blender 导出断言、单元测试、生产构建，以及安装版 Chrome/Edge 的 Playwright 验收。任一步骤失败都会立即停止。第二条命令验证所有输入并生成 `release/Z50II-Explorer/` 与 `release/Z50II-Explorer.zip`。
 
+普通 `test:e2e` 和 `build-all.ps1` 会继续对比已提交的 Playwright 视觉基线，但只把本次截图、性能测量和 Playwright 附件写入已忽略的 `runtime-results/`，不会改写已提交的验收证据。只有在明确需要重新生成证据时才运行下面的固定 Chrome+Edge 全量命令；它会更新已提交的任务截图、视觉基线和 `artifacts/validation/performance.json`，不接受选择性参数：
+
+```powershell
+.\scripts\pnpm.ps1 evidence:refresh
+```
+
+性能测试的硬回归门限为轨道旋转中位数 `20 FPS`、完整爆炸最低值 `15 FPS`，用于跨硬件捕获严重退化。设计说明中的 `45 FPS` 是 1080p 硬件加速桌面环境的软质量目标，不是所有设备上的硬性通过条件。
+
 `scripts/pnpm.ps1` 是可独立运行的仓库入口：它会自行定位 Codex 捆绑 Node，并将 Node 目录与仓库 `node_modules/.bin` 前置到子进程 `PATH`。因此下面的单项命令不依赖全局 `node`/`pnpm`/`npx`；可用 `./scripts/pnpm.ps1 exec node --version` 直接验证捆绑运行时。
 
 需要单独运行时，可使用：

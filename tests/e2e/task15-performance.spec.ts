@@ -1,8 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { performancePath } from './evidence-paths';
 
 const VIEWPORT = { width: 1920, height: 1080 } as const;
 const REPETITIONS = 3;
-const PERFORMANCE_PATH = 'artifacts/validation/performance.json';
+// These are hardware-tolerant regression guards, not the design's soft 45 FPS quality target.
+const MINIMUM_ORBIT_FPS = 20;
+const MINIMUM_FULL_EXPLOSION_FPS = 15;
 
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -223,8 +226,10 @@ test('measures the rebuilt viewer honestly at 1920x1080', async ({ page, browser
 
   expect(result.profile).toBe('high');
   expect(result.triangles).toBeGreaterThan(0);
-  expect(result.medianOrbitFps).toBeGreaterThan(0);
-  expect(result.minimumFullExplosionFps).toBeGreaterThan(0);
+  expect(result.medianOrbitFps).toBeGreaterThanOrEqual(MINIMUM_ORBIT_FPS);
+  expect(result.minimumFullExplosionFps).toBeGreaterThanOrEqual(
+    MINIMUM_FULL_EXPLOSION_FPS,
+  );
 
   // The project intentionally has no @types/node dependency, while Playwright runs this file in Node.
   // @ts-expect-error Node's runtime module is available to Playwright.
@@ -232,7 +237,7 @@ test('measures the rebuilt viewer honestly at 1920x1080', async ({ page, browser
   let priorResults: unknown[] = [];
   if (testInfo.project.name === 'edge') {
     try {
-      const prior = JSON.parse(await readFile(PERFORMANCE_PATH, 'utf8')) as {
+      const prior = JSON.parse(await readFile(performancePath, 'utf8')) as {
         results?: unknown[];
       };
       priorResults = prior.results ?? [];
@@ -255,6 +260,11 @@ test('measures the rebuilt viewer honestly at 1920x1080', async ({ page, browser
       allModulesLoadDefinition: 'Load-all activation until all eight modules report ready',
       orbitDefinition: 'Median requestAnimationFrame FPS during an active primary-button orbit, gated to frames no more than 100 ms after the latest pointer move; 180 pointer moves use a 10 ms minimum pacing delay across the measured interval, actual input duration is recorded, and post-input stationary frames are excluded',
       fullExplosionDefinition: 'Minimum requestAnimationFrame FPS while advancing the full-explosion slider across 90 frames',
+      regressionFloors: {
+        medianOrbitFps: MINIMUM_ORBIT_FPS,
+        minimumFullExplosionFps: MINIMUM_FULL_EXPLOSION_FPS,
+        rationale: 'Hardware-tolerant hard floors catch severe regressions; 45 FPS remains a soft quality target rather than a universal pass criterion',
+      },
       textureBytesDefinition: 'Sum of unique decoded texture width x height x 4 bytes in loaded module materials',
     },
     results: [
@@ -266,6 +276,6 @@ test('measures the rebuilt viewer honestly at 1920x1080', async ({ page, browser
       result,
     ],
   };
-  await writeFile(PERFORMANCE_PATH, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  await writeFile(performancePath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
   console.log(`PERFORMANCE_RESULT ${JSON.stringify(result)}`);
 });

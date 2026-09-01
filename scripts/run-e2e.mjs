@@ -11,6 +11,11 @@ const STOP_TIMEOUT_MS = 5_000;
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const viteCli = resolve(projectRoot, 'node_modules/vite/bin/vite.js');
 const playwrightCli = resolve(projectRoot, 'node_modules/@playwright/test/cli.js');
+const playwrightArguments = process.argv.slice(2);
+const refreshEvidence = process.env.Z50II_REFRESH_EVIDENCE === '1';
+const updatesSnapshots = playwrightArguments.some((argument) =>
+  argument === '--update-snapshots' || argument.startsWith('--update-snapshots='),
+);
 
 let previewProcess;
 let playwrightProcess;
@@ -112,6 +117,11 @@ process.once('SIGINT', () => { void handleSignal('SIGINT'); });
 process.once('SIGTERM', () => { void handleSignal('SIGTERM'); });
 
 try {
+  if (updatesSnapshots && !refreshEvidence) {
+    throw new Error(
+      'Updating committed visual baselines requires the explicit "pnpm evidence:refresh" command.',
+    );
+  }
   await assertPortAvailable();
   previewProcess = spawnNode(viteCli, [
     'preview',
@@ -124,7 +134,7 @@ try {
 
   playwrightProcess = spawnNode(playwrightCli, [
     'test',
-    ...process.argv.slice(2),
+    ...playwrightArguments,
   ]);
   const testExitCode = await waitForExit(playwrightProcess);
   playwrightProcess = undefined;
